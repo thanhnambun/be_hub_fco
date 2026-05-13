@@ -10,7 +10,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class RedisService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     public void set(String key, String value, Duration ttl) {
         redisTemplate.opsForValue().set(key, value, ttl);
@@ -21,7 +21,8 @@ public class RedisService {
     }
 
     public String get(String key) {
-        return redisTemplate.opsForValue().get(key);
+        Object value = redisTemplate.opsForValue().get(key);
+        return value != null ? value.toString() : null;
     }
 
     public Long increment(String key) {

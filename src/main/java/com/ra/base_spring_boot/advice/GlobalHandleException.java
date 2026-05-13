@@ -37,9 +37,19 @@ public class GlobalHandleException {
         return wrap(HttpStatus.NOT_FOUND, "Resource not found", ex.getMessage());
     }
 
-    @ExceptionHandler({UsernameNotFoundException.class, UserNotFoundException.class})
+    @ExceptionHandler({UsernameNotFoundException.class, UserNotFoundException.class, ResourceNotFoundException.class})
     public ResponseEntity<?> handleUserNotFound(RuntimeException ex) {
-        return wrap(HttpStatus.NOT_FOUND, "User not found", ex.getMessage());
+        return wrap(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<?> handleBusinessException(BusinessException ex) {
+        return wrap(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<?> handleAccountLockedException(AccountLockedException ex) {
+        return wrap(HttpStatus.FORBIDDEN, "ACCOUNT_LOCKED", null);
     }
 
     @ExceptionHandler(BadCredentialsException.class)

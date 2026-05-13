@@ -1,6 +1,8 @@
 package com.ra.base_spring_boot.security.jwt;
 
+import com.ra.base_spring_boot.exception.AccountLockedException;
 import com.ra.base_spring_boot.exception.TokenBlacklistedException;
+import com.ra.base_spring_boot.security.principle.MyUserDetails;
 import com.ra.base_spring_boot.services.RedisService;
 import com.ra.base_spring_boot.security.principle.MyUserDetailsService;
 import jakarta.servlet.FilterChain;
@@ -62,6 +64,14 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 String username = jwtService.extractUsername(token);
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    
+                    if (userDetails instanceof MyUserDetails myUserDetails) {
+                        Long userId = myUserDetails.getUser().getId();
+                        if (!userDetails.isEnabled() || redisService.exists("blacklist:user:" + userId)) {
+                            throw new AccountLockedException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
+                        }
+                    }
+
                     if (jwtService.isTokenValid(token, userDetails)) {
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(

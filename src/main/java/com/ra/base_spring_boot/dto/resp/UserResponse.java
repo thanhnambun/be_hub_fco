@@ -10,4 +10,6 @@ public class UserResponse {
     private String email;
     private String phone;
     private Boolean status;
+    private java.util.Set<String> roles;
+    private java.time.LocalDateTime createdAt;
 }
