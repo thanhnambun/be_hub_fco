@@ -1,0 +1,49 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: fco_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: fco_hub
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+    container_name: fco_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    container_name: fco_backend
+    depends_on:
+      - db
+      - redis
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/fco_hub?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SEED_PLAYERS_FILE_PATH: /app/data/players.json
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src/main/resources/data:/app/data
+
+  frontend:
+    build: ../front-end-next
+    container_name: fco_frontend
+    depends_on:
+      - backend
+    environment:
+      # Must match src/services/api-client.ts
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  mysql_data:

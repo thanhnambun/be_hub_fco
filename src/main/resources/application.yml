@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: base_spring_boot
+  datasource:
+    # Security: all credentials are sourced from environment variables
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ecommer_fco?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:default_user}
+    password: ${DB_PASSWORD:default_pass}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:2s}
+  flyway:
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+  jooq:
+    sql-dialect: org.hibernate.dialect.MySQL8Dialect
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:default_mail_user}
+    password: ${MAIL_PASSWORD:default_mail_password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+jwt:
+  secret:
+    key: ${JWT_SECRET_KEY:day-la-mot-chuoi-bi-mat-sieu-dai-va-an-toan-cho-fco-hub-2026-v2}
+  expired:
+    access: ${JWT_ACCESS_EXPIRED_MS:900000}
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
+
+seed:
+  # Đường dẫn file players.json — set qua env var khi chạy crawler hoặc Docker volume
+  # VD Docker: -e SEED_PLAYERS_FILE_PATH=/app/data/players.json
+  # VD local:  export SEED_PLAYERS_FILE_PATH=D:/code/ecommer_fco/players.json
+  players-file-path: ${SEED_PLAYERS_FILE_PATH:}

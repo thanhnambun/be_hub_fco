@@ -1,0 +1,20 @@
+# Build artifacts
+build/
+target/
+.gradle/
+bin/
+
+# VCS / IDE
+.git/
+.idea/
+.vscode/
+
+# Environment / local config
+.env
+.env.*
+
+# Logs
+*.log
+
+# Keep Docker context minimal
+docker-compose*.yml
