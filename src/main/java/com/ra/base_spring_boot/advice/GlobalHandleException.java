@@ -1,125 +1,86 @@
 package com.ra.base_spring_boot.advice;
 
-import com.ra.base_spring_boot.dto.ResponseWrapper;
-import com.ra.base_spring_boot.exception.*;
-import io.jsonwebtoken.ExpiredJwtException;
-import org.springframework.http.HttpStatus;
+import com.ra.base_spring_boot.dto.ErrorResponse;
+import com.ra.base_spring_boot.exception.BusinessException;
+import com.ra.base_spring_boot.exception.ErrorCode;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
+@lombok.RequiredArgsConstructor
 public class GlobalHandleException {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidException(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new java.util.LinkedHashMap<>();
-        ex.getBindingResult().getFieldErrors()
-                .forEach(fieldError -> errors.put(fieldError.getField(), fieldError.getDefaultMessage()));
-
-        return wrap(HttpStatus.BAD_REQUEST, "Dữ liệu đầu vào không hợp lệ", errors);
-    }
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<?> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
-        return wrap(HttpStatus.BAD_REQUEST, "File upload size exceeded", ex.getMessage());
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<?> handleNoResourceFoundException(NoResourceFoundException ex) {
-        return wrap(HttpStatus.NOT_FOUND, "Resource not found", ex.getMessage());
-    }
-
-    @ExceptionHandler({UsernameNotFoundException.class, UserNotFoundException.class, ResourceNotFoundException.class})
-    public ResponseEntity<?> handleUserNotFound(RuntimeException ex) {
-        return wrap(HttpStatus.NOT_FOUND, ex.getMessage(), null);
-    }
+    private final com.ra.base_spring_boot.services.AlertService alertService;
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<?> handleBusinessException(BusinessException ex) {
-        return wrap(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+        log.warn("Business error at {}: {} - {}", request.getRequestURI(), ex.getErrorCode().getCode(), ex.getMessage());
+        return buildResponse(ex.getErrorCode(), ex.getMessage(), request);
     }
 
-    @ExceptionHandler(AccountLockedException.class)
-    public ResponseEntity<?> handleAccountLockedException(AccountLockedException ex) {
-        return wrap(HttpStatus.FORBIDDEN, "ACCOUNT_LOCKED", null);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.toMap(
+                        org.springframework.validation.FieldError::getField,
+                        fe -> fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "Invalid value",
+                        (existing, replacement) -> existing
+                ));
+        
+        log.warn("Validation failed at {}: {}", request.getRequestURI(), errors);
+        return buildResponse(ErrorCode.USER_VALIDATION_ERROR, ErrorCode.USER_VALIDATION_ERROR.getMessage(), request, errors);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex) {
-        return wrap(HttpStatus.UNAUTHORIZED, "Tài khoản hoặc mật khẩu không chính xác", null);
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
+        log.warn("Login failed at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(ErrorCode.AUTH_INVALID_CREDENTIALS, ErrorCode.AUTH_INVALID_CREDENTIALS.getMessage(), request);
     }
 
-    @ExceptionHandler(TooManyRequestsException.class)
-    public ResponseEntity<?> handleTooManyRequests(TooManyRequestsException ex) {
-        return wrap(HttpStatus.TOO_MANY_REQUESTS, "Too many requests", ex.getMessage());
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access denied at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(ErrorCode.AUTH_ACCESS_DENIED, ErrorCode.AUTH_ACCESS_DENIED.getMessage(), request);
     }
 
-    @ExceptionHandler(ExpiredJwtException.class)
-    public ResponseEntity<?> handleExpiredJwt(ExpiredJwtException ex) {
-        return wrap(HttpStatus.UNAUTHORIZED, "Access token has expired", null);
-    }
-
-    @ExceptionHandler(TokenBlacklistedException.class)
-    public ResponseEntity<?> handleBlacklistedToken(TokenBlacklistedException ex) {
-        return wrap(HttpStatus.UNAUTHORIZED, "Token is blacklisted", ex.getMessage());
-    }
-
-    @ExceptionHandler(HttpBadRequest.class)
-    public ResponseEntity<?> handleHttpBadReqeust(HttpBadRequest ex) {
-        return wrap(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler(HttpUnAuthorized.class)
-    public ResponseEntity<?> handleHttpUnAuthorized(HttpUnAuthorized ex) {
-        return wrap(HttpStatus.UNAUTHORIZED, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler(HttpForbiden.class)
-    public ResponseEntity<?> handleHttpForbiden(HttpForbiden ex) {
-        return wrap(HttpStatus.FORBIDDEN, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler(HttpNotFound.class)
-    public ResponseEntity<?> handleHttpNotFound(HttpNotFound ex) {
-        return wrap(HttpStatus.NOT_FOUND, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler(HttpConflict.class)
-    public ResponseEntity<?> handleHttpConflict(HttpConflict ex) {
-        return wrap(HttpStatus.CONFLICT, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<?> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
-        return wrap(HttpStatus.BAD_REQUEST, "Dữ liệu truyền vào không đúng định dạng", ex.getMessage());
-    }
-
-    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
-    public ResponseEntity<?> handleMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
-        return wrap(HttpStatus.BAD_REQUEST, "Dữ liệu JSON không hợp lệ", ex.getMessage());
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex, HttpServletRequest request) {
+        log.warn("Authentication failed at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(ErrorCode.AUTH_UNAUTHORIZED, ErrorCode.AUTH_UNAUTHORIZED.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleUnknown(Exception ex) {
-        return wrap(HttpStatus.INTERNAL_SERVER_ERROR, "An internal server error occurred", ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleAll(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled exception at " + request.getRequestURI(), ex);
+        
+        // Alerting for 500 errors
+        alertService.sendCriticalAlert("Unhandled Exception at " + request.getRequestURI() + ": " + ex.getMessage(), ex);
+        
+        return buildResponse(ErrorCode.SYST_ERROR, ErrorCode.SYST_ERROR.getMessage(), request);
     }
 
-    private ResponseEntity<ResponseWrapper<Object>> wrap(HttpStatus status, String message, Object data) {
-        return ResponseEntity.status(status).body(
-                ResponseWrapper.builder()
-                        .status(status)
-                        .code(status.value())
-                        .message(message)
-                        .data(data)
-                        .build()
+    private ResponseEntity<ErrorResponse> buildResponse(ErrorCode errorCode, String message, HttpServletRequest request) {
+        return buildResponse(errorCode, message, request, null);
+    }
+
+    private ResponseEntity<ErrorResponse> buildResponse(ErrorCode errorCode, String message, HttpServletRequest request, Object details) {
+        ErrorResponse response = ErrorResponse.of(
+                errorCode.getCode(),
+                message,
+                request.getRequestURI(),
+                details
         );
+        return new ResponseEntity<>(response, errorCode.getStatus());
     }
 }

@@ -5,10 +5,7 @@ import com.ra.base_spring_boot.dto.req.ChangePasswordRequest;
 import com.ra.base_spring_boot.dto.req.UpdateProfileRequest;
 import com.ra.base_spring_boot.dto.resp.AuthResponse;
 import com.ra.base_spring_boot.dto.resp.UserResponse;
-import com.ra.base_spring_boot.exception.BusinessException;
-import com.ra.base_spring_boot.exception.HttpBadRequest;
-import com.ra.base_spring_boot.exception.ResourceNotFoundException;
-import com.ra.base_spring_boot.exception.UserNotFoundException;
+import com.ra.base_spring_boot.exception.*;
 import com.ra.base_spring_boot.model.Role;
 import com.ra.base_spring_boot.model.User;
 import com.ra.base_spring_boot.repository.IRoleRepository;
@@ -34,12 +31,13 @@ public class UserServiceImpl implements IUserService {
     private final IRoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenBlacklistService tokenBlacklistService;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     @Override
     @Transactional
     public AuthResponse updateProfile(Long userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("KhÃ´ng tÃ¬m tháº¥y ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
 
         user.setFullName(request.getFullName().trim());
         
@@ -69,14 +67,14 @@ public class UserServiceImpl implements IUserService {
     @Transactional
     public void changePassword(Long userId, ChangePasswordRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("KhÃ´ng tÃ¬m tháº¥y ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new HttpBadRequest("Máº­t kháº©u cÅ© khÃ´ng chÃ­nh xÃ¡c");
+            throw new HttpBadRequest("Mật khẩu cũ không chính xác");
         }
 
         if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
-            throw new HttpBadRequest("Máº­t kháº©u má»›i khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i máº­t kháº©u cÅ©");
+            throw new HttpBadRequest("Mật khẩu mới không được trùng với mật khẩu cũ");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -125,7 +123,7 @@ public class UserServiceImpl implements IUserService {
             boolean isCustomer = targetUser.getRoles().stream()
                     .anyMatch(r -> r.getRoleName().name().equals("ROLE_CUSTOMER"));
             if (!isCustomer) {
-                throw new BusinessException("Bạn không có quyền xem thông tin tài khoản quản trị viên khác");
+                throw new BusinessException("Bạn không có quyền xem thông tin tài khoản quản trị viên khác", ErrorCode.AUTH_ACCESS_DENIED);
             }
         }
 
@@ -136,14 +134,14 @@ public class UserServiceImpl implements IUserService {
     @Transactional
     public UserResponse updateUserByAdmin(Long id, AdminUserUpdateRequest request) {
         if (id == 1) {
-            throw new BusinessException("Không được phép sửa thông tin Root Admin");
+            throw new BusinessException("Không được phép sửa thông tin Root Admin", ErrorCode.AUTH_ACCESS_DENIED);
         }
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
         if (request.getRoleId() == 1) {
-            throw new BusinessException("Không được phép cấp quyền ROLE_ADMIN");
+            throw new BusinessException("Không được phép cấp quyền ROLE_ADMIN", ErrorCode.AUTH_ACCESS_DENIED);
         }
 
         Role role = roleRepository.findById(request.getRoleId())
@@ -162,7 +160,7 @@ public class UserServiceImpl implements IUserService {
     @Transactional
     public void toggleUserStatus(Long id) {
         if (id == 1) {
-            throw new BusinessException("Không được phép khóa Root Admin");
+            throw new BusinessException("Không được phép khóa Root Admin", ErrorCode.AUTH_ACCESS_DENIED);
         }
 
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -179,7 +177,7 @@ public class UserServiceImpl implements IUserService {
             boolean isCustomer = targetUser.getRoles().stream()
                     .anyMatch(r -> r.getRoleName().name().equals("ROLE_CUSTOMER"));
             if (!isCustomer) {
-                throw new BusinessException("Bạn không có quyền thay đổi trạng thái của tài khoản quản trị viên khác");
+                throw new BusinessException("Bạn không có quyền thay đổi trạng thái của tài khoản quản trị viên khác", ErrorCode.AUTH_ACCESS_DENIED);
             }
         }
 
@@ -189,6 +187,8 @@ public class UserServiceImpl implements IUserService {
 
         if (!targetUser.getStatus()) {
             tokenBlacklistService.blacklistAllUserTokens(id);
+            // Notify user via WebSocket for instant logout
+            messagingTemplate.convertAndSend("/topic/user-" + id, "ACCOUNT_LOCKED");
         }
     }
 

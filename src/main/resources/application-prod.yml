@@ -1,8 +1,25 @@
 spring:
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate # Chặn tự động sửa schema ở prod
+    show-sql: false
     properties:
       hibernate:
         format_sql: false
-        show_sql: false
+        generate_statistics: false
+
+  # Flyway là kênh duy nhất để quản lý database
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-stacktrace: never # Không bao giờ nhả stacktrace ra ngoài
+    include-message: always
+    include-binding-errors: never
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: ERROR # Tắt log SQL
+    com.ra.base_spring_boot: INFO

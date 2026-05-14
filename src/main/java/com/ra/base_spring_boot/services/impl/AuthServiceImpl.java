@@ -7,6 +7,7 @@ import com.ra.base_spring_boot.dto.req.ResetPasswordRequest;
 import com.ra.base_spring_boot.dto.resp.AuthIssuanceResult;
 import com.ra.base_spring_boot.dto.resp.AuthResponse;
 import com.ra.base_spring_boot.dto.resp.UserProfileResponse;
+import com.ra.base_spring_boot.exception.AccountLockedException;
 import com.ra.base_spring_boot.exception.HttpBadRequest;
 import com.ra.base_spring_boot.exception.TooManyRequestsException;
 import com.ra.base_spring_boot.exception.UserNotFoundException;
@@ -57,7 +58,7 @@ public class AuthServiceImpl implements IAuthService {
     private final RedisService          redisService;
     private final MailService           mailService;
 
-    // â”€â”€ Register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Register ───────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -92,7 +93,7 @@ public class AuthServiceImpl implements IAuthService {
         return issueTokens(savedUser);
     }
 
-    // â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Login ───────────────────────────────────────────────────────────────────
 
     @Override
     public AuthIssuanceResult login(LoginRequest request, HttpServletRequest httpRequest) {
@@ -106,7 +107,7 @@ public class AuthServiceImpl implements IAuthService {
             );
             User user = (User) authentication.getPrincipal();
             if (!Boolean.TRUE.equals(user.getStatus())) {
-                throw new HttpBadRequest("Account is disabled");
+                throw new com.ra.base_spring_boot.exception.AccountLockedException("Tài khoản của bạn đã bị khóa.");
             }
             clearLoginFailCounter(ip, principal);
             return issueTokens(user);
@@ -116,7 +117,7 @@ public class AuthServiceImpl implements IAuthService {
         }
     }
 
-    // â”€â”€ Refresh â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Refresh ─────────────────────────────────────────────────────────────────
 
     @Override
     public AuthIssuanceResult refreshToken(String oldRefreshToken) {
@@ -128,36 +129,40 @@ public class AuthServiceImpl implements IAuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new HttpBadRequest("User not found"));
 
-        // Rotate: xÃ³a token cÅ©, cáº¥p token má»›i
+        if (!Boolean.TRUE.equals(user.getStatus())) {
+            throw new AccountLockedException("Tài khoản đã bị khóa");
+        }
+
+        // Rotate: xóa token cũ, cấp token mới
         redisService.delete(refreshKey(oldRefreshToken));
 
         return issueTokens(user);
     }
 
-    // â”€â”€ Logout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Logout ──────────────────────────────────────────────────────────────────
 
     @Override
     public void logout(String accessToken, String refreshToken) {
-        // Blacklist access token cho Ä‘áº¿n khi háº¿t háº¡n
+        // Blacklist access token cho đến khi hết hạn
         if (accessToken != null && !accessToken.isBlank()) {
             long remainingMillis = jwtService.getRemainingTtlMillis(accessToken);
             if (remainingMillis > 0) {
                 redisService.set(blacklistKey(accessToken), "1", Duration.ofMillis(remainingMillis));
             }
         }
-        // XÃ³a refresh token khá»i Redis
+        // Xóa refresh token khỏi Redis
         if (refreshToken != null && !refreshToken.isBlank()) {
             redisService.delete(refreshKey(refreshToken));
         }
     }
 
-    // â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Profile ─────────────────────────────────────────────────────────────────
 
     @Override
     public UserProfileResponse getMyProfile() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("KhÃ´ng tÃ¬m tháº¥y ngÆ°á»i dÃ¹ng Ä‘Äƒng nháº­p"));
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng đăng nhập"));
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -185,30 +190,30 @@ public class AuthServiceImpl implements IAuthService {
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new HttpBadRequest("Máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p");
+            throw new HttpBadRequest("Mật khẩu xác nhận không khớp");
         }
 
         String token = request.getToken().trim();
         String email = redisService.get(resetPasswordKey(token));
 
         if (email == null || email.isBlank()) {
-            throw new HttpBadRequest("Token khÃ´ng há»£p lá»‡ hoáº·c háº¿t háº¡n");
+            throw new HttpBadRequest("Token không hợp lệ hoặc hết hạn");
         }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new HttpBadRequest("Token khÃ´ng há»£p lá»‡ hoáº·c háº¿t háº¡n"));
+                .orElseThrow(() -> new HttpBadRequest("Token không hợp lệ hoặc hết hạn"));
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         redisService.delete(resetPasswordKey(token));
     }
 
-    // â”€â”€ Private helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Private helpers ─────────────────────────────────────────────────────────
 
     /**
-     * Sinh cáº·p token má»›i, lÆ°u refresh token vÃ o Redis, tráº£ vá» AuthIssuanceResult.
-     * AuthResponse trong result chá»‰ chá»©a profile data â€” KHÃ”NG chá»©a token.
-     * Token Ä‘Æ°á»£c controller láº¥y tá»« result Ä‘á»ƒ set vÃ o httpOnly Cookie.
+     * Sinh cặp token mới, lưu refresh token vào Redis, trả về AuthIssuanceResult.
+     * AuthResponse trong result chỉ chứa profile data — KHÔNG chứa token.
+     * Token được controller lấy từ result để set vào httpOnly Cookie.
      */
     private AuthIssuanceResult issueTokens(User user) {
         String accessToken  = jwtService.generateAccessToken(user);

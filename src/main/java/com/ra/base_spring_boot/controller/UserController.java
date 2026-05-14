@@ -34,6 +34,6 @@ public class UserController {
             @Valid @RequestBody com.ra.base_spring_boot.dto.req.ChangePasswordRequest request) {
         
         userService.changePassword(userDetails.getId(), request);
-        return ResponseEntity.ok(java.util.Map.of("message", "Äá»•i máº­t kháº©u thÃ nh cÃ´ng"));
+        return ResponseEntity.ok(java.util.Map.of("message", "Đổi mật khẩu thành công"));
     }
 }

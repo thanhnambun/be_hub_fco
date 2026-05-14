@@ -39,7 +39,7 @@ public class PlayerSyncService {
     private static final int CHUNK_SIZE = 1000;
     private static final int MAX_IMAGE_URL_LEN = 500;
 
-    // Lá»‡nh SQL tá»± Ä‘á»™ng thÃªm/cáº­p nháº­t thÃ´ng tin gá»‘c cá»§a cáº§u thá»§
+    // Lệnh SQL tự động thêm/cập nhật thông tin gốc của cầu thủ
     private static final String UPSERT_PLAYERS_SQL = """
             INSERT INTO fco_players (external_id, player_name)
             VALUES (?, ?)
@@ -122,11 +122,11 @@ public class PlayerSyncService {
             jdbcTemplate.batchUpdate(INSERT_IGNORE_SEASON_SQL, seasonChunk, seasonChunk.size(), (ps, dto) -> {
                 String code = dto.getSeasonCode().trim().toUpperCase(Locale.ROOT);
                 ps.setString(1, code);
-                ps.setString(2, code); // Sá»­ dá»¥ng code lÃ m tÃªn máº·c Ä‘á»‹nh
+                ps.setString(2, code); // Sử dụng code làm tên mặc định
             });
         }
 
-        // 1.2. Auto-Player (UPSERT - Cáº­p nháº­t tÃªn náº¿u Ä‘Ã£ tá»“n táº¡i)
+        // 1.2. Auto-Player (UPSERT - Cập nhật tên nếu đã tồn tại)
         List<PlayerCardDTO> uniquePlayers = validRows.stream()
                 .filter(distinctByKey(dto -> dto.getExternalId().trim()))
                 .toList();
@@ -140,7 +140,7 @@ public class PlayerSyncService {
         }
 
         // =================================================================================
-        // BÆ¯á»šC 2: RE-FETCH MAPS (Load ID má»›i lÃªn RAM)
+        // BƯỚC 2: RE-FETCH MAPS (Load ID mới lên RAM)
         // =================================================================================
         Set<String> externalIds = validRows.stream()
                 .map(PlayerCardDTO::getExternalId)
@@ -152,10 +152,10 @@ public class PlayerSyncService {
                 .map(code -> code.trim().toUpperCase(Locale.ROOT))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        // Äáº£m báº£o Player vÃ  Season tá»“n táº¡i trÆ°á»›c khi láº¥y ID Map
+        // Đảm bảo Player và Season tồn tại trước khi lấy ID Map
         ensureParentsExist(validRows, seasonCodes);
 
-        // Cache ID Ä‘á»ƒ trÃ¡nh N+1 query khi xá»­ lÃ½ danh sÃ¡ch lá»›n.
+        // Cache ID để tránh N+1 query khi xử lý danh sách lớn.
         Map<String, Long> playerIdByExternalId = fetchPlayerIdMap(externalIds);
         Map<String, Long> seasonIdByCode = fetchSeasonIdMap(seasonCodes);
 
@@ -264,7 +264,7 @@ public class PlayerSyncService {
     }
 
     private void ensureParentsExist(List<PlayerCardDTO> rows, Set<String> seasonCodes) {
-        // 1. Tá»± Ä‘á»™ng táº¡o Seasons náº¿u chÆ°a cÃ³
+        // 1. Tự động tạo Seasons nếu chưa có
         if (!seasonCodes.isEmpty()) {
             String sql = "INSERT IGNORE INTO fco_seasons (season_code, season_name) VALUES (?, ?)";
             jdbcTemplate.batchUpdate(sql, seasonCodes.stream()
@@ -272,9 +272,9 @@ public class PlayerSyncService {
                     .toList());
         }
 
-        // 2. Tá»± Ä‘á»™ng táº¡o Players náº¿u chÆ°a cÃ³
+        // 2. Tự động tạo Players nếu chưa có
         if (!rows.isEmpty()) {
-            // Láº¥y danh sÃ¡ch duy nháº¥t theo externalId Ä‘á»ƒ batch insert hiá»‡u quáº£
+            // Lấy danh sách duy nhất theo externalId để batch insert hiệu quả
             Map<String, String> uniquePlayers = rows.stream()
                     .filter(r -> r.getExternalId() != null && !r.getExternalId().isBlank())
                     .collect(Collectors.toMap(
