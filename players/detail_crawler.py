@@ -19,7 +19,7 @@ Chức năng:
 Cách chạy:
   python detail_crawler.py               # Chạy toàn bộ
   python detail_crawler.py --limit 5     # Test 5 cầu thủ đầu
-  python detail_crawler.py --resume      # Tiếp tục từ chỗ dừng
+  python detail_crawler.py --resume      # Bỏ qua ID đã crawl (detail_crawled.json)
   python detail_crawler.py --no-sync     # Chỉ crawl, không gửi API
 """
 
@@ -52,15 +52,16 @@ SYNC_DETAIL_API = "http://localhost:8080/api/v1/admin/sync/cards/detail"
 LOGIN_URL       = "http://localhost:8080/api/v1/auth/login"
 
 ADMIN_EMAIL     = "admin"   # ← Thay email admin
-ADMIN_PASSWORD  = "password123"       # ← Thay password admin
+ADMIN_PASSWORD  = "admin12345"       # ← Thay password admin
 
 OVR_BONUS         = 4       # Level 5 kinh nghiệm = Level 1 + 4
 DELAY_SECONDS     = 1.5     # Delay giữa mỗi request tránh rate-limit
 CHUNK_SIZE        = 50      # Số record gửi lên API mỗi lần
 CHECKPOINT_EVERY  = 10      # Lưu done list mỗi N cầu thủ (phòng crash)
-INPUT_FILE        = "../src/main/resources/data/players.json"           # Output của Pha A
-DONE_FILE         = "../src/main/resources/data/detail_done.json"       # external_id đã crawl thành công
-BACKUP_FILE       = "../src/main/resources/data/detail_backup.json"     # Backup local toàn bộ payload (phòng API down)
+INPUT_FILE        = "../src/main/resources/data/players.json"
+CRAWLED_FILE      = "../src/main/resources/data/detail_crawled.json"    # đã crawl HTML thành công
+SYNCED_FILE       = "../src/main/resources/data/detail_synced.json"      # đã POST API chunk thành công
+DONE_FILE         = "../src/main/resources/data/detail_done.json"       # summary / report, không dùng làm checkpoint
 # Ghi lỗi HTTP / mạng khi POST chunk (bổ sung cho bảng DB fco_detail_sync_errors của backend)
 DETAIL_API_ERROR_LOG = "../src/main/resources/data/detail_sync_api_errors.jsonl"
 
@@ -110,11 +111,24 @@ def create_session() -> requests.Session:
 
 # ─── Nuxt State Parser (Node.js) ──────────────────────────────────────────────
 
+NODE_FAIL_COUNT = 0
+NODE_FAIL_THRESHOLD = 3
+NODE_FAIL_COOLDOWN_SECONDS = 10
+NODE_LAST_FAIL_AT = 0.0
+
+
 def eval_nuxt_via_node(nuxt_script: str) -> dict:
     """
     Dùng Node.js eval JavaScript thật của Nuxt → object data đầy đủ.
     Tránh mọi vấn đề encoding / ký tự đặc biệt khi parse thủ công.
     """
+    global NODE_FAIL_COUNT, NODE_LAST_FAIL_AT
+    if NODE_FAIL_COUNT >= NODE_FAIL_THRESHOLD:
+        elapsed = time.time() - NODE_LAST_FAIL_AT
+        if elapsed < NODE_FAIL_COOLDOWN_SECONDS:
+            raise RuntimeError(f"Node.js tạm cooldown do lỗi liên tiếp ({NODE_FAIL_COUNT})")
+        NODE_FAIL_COUNT = 0
+
     node_code = f"""
 const window = {{}};
 {nuxt_script}
@@ -145,8 +159,15 @@ try {{
             capture_output=True, text=True, timeout=15, encoding='utf-8'
         )
         if result.returncode != 0:
+            NODE_FAIL_COUNT += 1
+            NODE_LAST_FAIL_AT = time.time()
             raise RuntimeError(f"Node.js stderr: {result.stderr[:300]}")
+        NODE_FAIL_COUNT = 0
         return json.loads(result.stdout)
+    except Exception:
+        NODE_FAIL_COUNT += 1
+        NODE_LAST_FAIL_AT = time.time()
+        raise
     finally:
         os.unlink(tmp.name)
 
@@ -161,6 +182,13 @@ def extract_nuxt_script(html: str) -> Optional[str]:
 
 # ─── Build payload ────────────────────────────────────────────────────────────
 
+def atomic_write_json(path: str, data: Any) -> None:
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, path)
+
+
 def parse_price_raw(price_raw: str) -> Optional[int]:
     """
     Chuyển "33,800B" → 33800 (đơn vị lưu DB = nghìn tỷ BP game).
@@ -170,6 +198,25 @@ def parse_price_raw(price_raw: str) -> Optional[int]:
         return int(re.sub(r"[^\d]", "", price_raw.replace(",", "")))
     except Exception:
         return None
+
+
+def validate_payload(payload: dict) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if not payload.get("external_id"):
+        return False
+    if not isinstance(payload.get("traits"), list):
+        return False
+    if not isinstance(payload.get("prices"), list):
+        return False
+    if not isinstance(payload.get("card_detail"), dict):
+        return False
+    card_detail = payload["card_detail"]
+    for key in ("pace", "shooting", "passing", "dribbling", "defending", "physicality"):
+        value = card_detail.get(key)
+        if value is not None and (not isinstance(value, int) or value < 0):
+            return False
+    return True
 
 
 def build_payload(raw: dict, external_id: str) -> Optional[dict]:
@@ -214,7 +261,13 @@ def build_payload(raw: dict, external_id: str) -> Optional[dict]:
         "Phòng thủ": "defending",
         "Thể lực":   "physicality",
     }
-    six_lv1 = {eng: attrs.get(vn, 0) for vn, eng in ATTR_MAP.items()}
+    six_lv1 = {}
+    for vn, eng in ATTR_MAP.items():
+        v = attrs.get(vn, 0)
+        try:
+            six_lv1[eng] = int(v) if v is not None else 0
+        except Exception:
+            six_lv1[eng] = 0
     six_lv5 = {k: v + OVR_BONUS for k, v in six_lv1.items()}
 
     # ── OVR theo vị trí ──────────────────────────────────────────────
@@ -257,10 +310,14 @@ def build_payload(raw: dict, external_id: str) -> Optional[dict]:
 
     clubs = []
     if db.get("team_name"):
+        try:
+            club_fifa_id = int(club_id_fifaaddict) if club_id_fifaaddict else None
+        except Exception:
+            club_fifa_id = None
         clubs.append({
             "club_name": db.get("team_name"),
             "club_slug": club_slug,
-            "club_fifaaddict_id": int(club_id_fifaaddict) if club_id_fifaaddict else None,
+            "club_fifaaddict_id": club_fifa_id,
             "crest_url": (
                 f"https://s1.fifaaddict.com/fo4/crests/dark/d{club_id_fifaaddict}.png"
                 if club_id_fifaaddict else None
@@ -299,7 +356,7 @@ def build_payload(raw: dict, external_id: str) -> Optional[dict]:
             "bodytype":          db.get("bodytype_name"),
             "reputation":        db.get("reputation"),
             "price_updated_at":    price_date,
-            "ovr_by_pos_json":      json.dumps(ovr_by_pos),
+            "ovr_by_pos":           ovr_by_pos,
 
             # 6 chỉ số Level 5 (giá trị lưu vào DB)
             "pace":        six_lv5["pace"],
@@ -351,7 +408,11 @@ def crawl_one(session: requests.Session, external_id: str) -> Optional[dict]:
         print(f"  ⚠ Node error [{external_id}]: {raw['_node_error']}")
         return None
 
-    return build_payload(raw, external_id)
+    payload = build_payload(raw, external_id)
+    if payload is not None and not validate_payload(payload):
+        print(f"  ⚠ Payload invalid [{external_id}]")
+        return None
+    return payload
 
 
 # ─── Sync lên API ─────────────────────────────────────────────────────────────
@@ -372,9 +433,59 @@ def append_api_transport_error(chunk: list[dict], http_status: Optional[int], de
         print(f"  [warn] Không ghi được {DETAIL_API_ERROR_LOG}: {e}")
 
 
-def sync_to_api(payloads: list[dict], token: str) -> None:
+def load_id_set(path: str) -> set[str]:
+    if not os.path.exists(path):
+        return set()
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return set(data)
+        if isinstance(data, dict):
+            if "ids" in data:
+                if isinstance(data["ids"], dict):
+                    return set(data["ids"].keys())
+                elif isinstance(data["ids"], list):
+                    return set(data["ids"])
+            return set(data.keys())
+        return set()
+    except Exception:
+        return set()
+
+
+def save_id_set(path: str, ids: set[str]) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "generated_at": now,
+        "count": len(ids),
+        "ids": {i: {"at": now} for i in sorted(ids)},
+    }
+    atomic_write_json(path, payload)
+
+
+def write_done_summary(path: str, crawled_ids: set[str], synced_ids: set[str], crawl_failed_ids: list[str], sync_failed_ids: list[str], total_targets: int, elapsed_seconds: float) -> None:
+    summary = {
+        "run_at": datetime.now(timezone.utc).isoformat(),
+        "elapsed_seconds": round(elapsed_seconds, 2),
+        "total_targets": total_targets,
+        "total_crawled": len(crawled_ids),
+        "total_synced": len(synced_ids),
+        "total_crawl_failed": len(crawl_failed_ids),
+        "total_sync_failed": len(sync_failed_ids),
+        "crawl_failed_ids": crawl_failed_ids,
+        "sync_failed_ids": sync_failed_ids,
+        "synced_not_crawled": sorted(synced_ids - crawled_ids),
+        "crawled_not_synced": sorted(crawled_ids - synced_ids),
+        "completed_ids": sorted(crawled_ids & synced_ids),
+    }
+    atomic_write_json(path, summary)
+
+
+def sync_to_api(payloads: list[dict], token: str) -> list[str]:
+    """POST từng chunk; trả về external_id đã sync HTTP thành công (ack thật, không nhầm với crawl)."""
+    synced_ids: list[str] = []
     if not payloads:
-        return
+        return synced_ids
     session = requests.Session()
     session.headers.update({
         "Content-Type":  "application/json",
@@ -408,6 +519,10 @@ def sync_to_api(payloads: list[dict], token: str) -> None:
                     except Exception:
                         pass
                     success = True
+                    for p in chunk:
+                        eid = p.get("external_id")
+                        if eid:
+                            synced_ids.append(eid)
                     break
                 print(f"  [sync] Thử {attempt}: HTTP {resp.status_code} — {last_body[:200]}")
             except Exception as e:
@@ -418,6 +533,7 @@ def sync_to_api(payloads: list[dict], token: str) -> None:
             detail = last_exc if last_exc else f"HTTP {last_status}: {last_body[:2000]}"
             print(f"  ❌ Chunk {i+1}~{i+len(chunk)} thất bại sau 3 lần — ghi {DETAIL_API_ERROR_LOG}")
             append_api_transport_error(chunk, last_status, detail)
+    return synced_ids
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -425,7 +541,7 @@ def sync_to_api(payloads: list[dict], token: str) -> None:
 def main():
     parser = argparse.ArgumentParser(description="FCO Hub — Pha B: Crawl chi tiết cầu thủ")
     parser.add_argument("--resume",  action="store_true",
-                        help="Bỏ qua external_id đã crawl thành công (từ detail_done.json)")
+                        help="Bỏ qua external_id đã sync (detail_synced.json)")
     parser.add_argument("--no-sync", action="store_true",
                         help="Chỉ crawl và in kết quả, không gửi lên API")
     parser.add_argument("--limit",   type=int, default=0,
@@ -442,13 +558,16 @@ def main():
     all_ids = list({p["external_id"] for p in phase_a if p.get("external_id")})
     print(f"[info] Tổng external_id duy nhất từ Pha A: {len(all_ids)}")
 
-    done_ids: set[str] = set()
-    if args.resume and os.path.exists(DONE_FILE):
-        with open(DONE_FILE, encoding="utf-8") as f:
-            done_ids = set(json.load(f))
-        print(f"[info] Đã crawl trước đó: {len(done_ids)} → bỏ qua")
+    crawled_ids = load_id_set(CRAWLED_FILE)
+    synced_ids = load_id_set(SYNCED_FILE)
 
-    targets = [i for i in all_ids if i not in done_ids]
+    print(f"[info] Đã crawl trước đó: {len(crawled_ids)}")
+    print(f"[info] Đã sync API trước đó: {len(synced_ids)}")
+
+    if args.resume:
+        targets = [i for i in all_ids if i not in synced_ids]
+    else:
+        targets = all_ids
     if args.limit > 0:
         targets = targets[:args.limit]
         print(f"[info] Giới hạn test: {args.limit} cầu thủ")
@@ -461,18 +580,11 @@ def main():
 
     session     = create_session()
     results     = []
-    failed_ids  = []
-    success_ids = list(done_ids)
+    crawl_failed_ids  = []
+    sync_failed_ids = []
     start       = time.time()
+    api_sync_failed = False
 
-    backup_data: list[dict] = []
-    if os.path.exists(BACKUP_FILE):
-        try:
-            with open(BACKUP_FILE, encoding="utf-8") as f:
-                backup_data = json.load(f)
-            print(f"[info] Đọc backup cũ: {len(backup_data)} records")
-        except Exception:
-            backup_data = []
 
     for idx, ext_id in enumerate(targets, 1):
         print(f"[{idx:>4}/{len(targets)}] {ext_id}...", end=" ", flush=True)
@@ -480,54 +592,56 @@ def main():
         payload = crawl_one(session, ext_id)
         if payload:
             results.append(payload)
-            backup_data.append(payload)  
-            success_ids.append(ext_id)
+            crawled_ids.add(ext_id)
             cd = payload["card_detail"]
             lp_str = f"LivePerf+{cd['liveperf']}" if cd["has_live_perf"] else "NoLivePerf"
             print(f"✓ {lp_str} | Traits={len(payload['traits'])} | Prices={len(payload['prices'])}")
         else:
-            failed_ids.append(ext_id)
+            crawl_failed_ids.append(ext_id)
             print("✗")
 
         if idx % CHECKPOINT_EVERY == 0:
-            with open(DONE_FILE, "w", encoding="utf-8") as f:
-                json.dump(success_ids, f)
-            print(f"  [checkpoint] Đã lưu {len(success_ids)} ids thành công")
+            save_id_set(CRAWLED_FILE, crawled_ids)
+            print(f"  [checkpoint] Đã lưu {len(crawled_ids)} crawled ids")
 
         # ── Sync API theo batch ──────────────────────────────────────────
         if not args.no_sync and token and len(results) >= CHUNK_SIZE:
-            sync_to_api(results, token)
+            chunk_synced = sync_to_api(results, token)
+            if len(chunk_synced) < len(results):
+                api_sync_failed = True
+                chunk_synced_set = set(chunk_synced)
+                sync_failed_ids.extend([p.get("external_id") for p in results if p.get("external_id") not in chunk_synced_set])
+            synced_ids.update(chunk_synced)
+            save_id_set(SYNCED_FILE, synced_ids)
             results = []
-
-        # ── Backup local định kỳ (phòng API down) ───────────────────────
-        if idx % CHUNK_SIZE == 0:
-            with open(BACKUP_FILE, "w", encoding="utf-8") as f:
-                json.dump(backup_data, f, ensure_ascii=False)
-            print(f"  [backup] Đã lưu {len(backup_data)} records → {BACKUP_FILE}")
 
         time.sleep(DELAY_SECONDS)
 
     # Sync phần còn lại lên API
     if not args.no_sync and token and results:
-        sync_to_api(results, token)
+        chunk_synced = sync_to_api(results, token)
+        if len(chunk_synced) < len(results):
+            api_sync_failed = True
+            chunk_synced_set = set(chunk_synced)
+            sync_failed_ids.extend([p.get("external_id") for p in results if p.get("external_id") not in chunk_synced_set])
+        synced_ids.update(chunk_synced)
+        save_id_set(SYNCED_FILE, synced_ids)
 
-    # Lưu backup cuối cùng
-    with open(BACKUP_FILE, "w", encoding="utf-8") as f:
-        json.dump(backup_data, f, ensure_ascii=False)
-    print(f"[backup] Đã lưu toàn bộ {len(backup_data)} records → {BACKUP_FILE}")
+    save_id_set(CRAWLED_FILE, crawled_ids)
+    save_id_set(SYNCED_FILE, synced_ids)
+    write_done_summary(DONE_FILE, crawled_ids, synced_ids, crawl_failed_ids, sync_failed_ids, len(targets), time.time() - start)
 
-    # 5. Lưu done list
-    with open(DONE_FILE, "w", encoding="utf-8") as f:
-        json.dump(success_ids, f)
-
-    # 6. Tóm tắt
     elapsed = time.time() - start
-    new_ok  = len(success_ids) - len(done_ids)
     print(f"\n{'='*55}")
-    print(f"[XONG] {elapsed:.0f}s | ✓ {new_ok} | ✗ {len(failed_ids)}")
-    if failed_ids:
-        print(f"IDs lỗi: {failed_ids[:10]}{'...' if len(failed_ids) > 10 else ''}")
+    print(f"[XONG] {elapsed:.0f}s | crawled={len(crawled_ids)} | synced={len(synced_ids)} | crawl_fail={len(crawl_failed_ids)} | sync_fail={len(sync_failed_ids)}")
+    if crawl_failed_ids:
+        print(f"IDs crawl lỗi: {crawl_failed_ids[:10]}{'...' if len(crawl_failed_ids) > 10 else ''}")
+    if sync_failed_ids:
+        print(f"IDs sync lỗi: {sync_failed_ids[:10]}{'...' if len(sync_failed_ids) > 10 else ''}")
     print(f"{'='*55}")
+
+    if api_sync_failed or crawl_failed_ids or sync_failed_ids:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

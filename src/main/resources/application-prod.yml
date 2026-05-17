@@ -22,4 +22,4 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: ERROR # Tắt log SQL
-    com.ra.base_spring_boot: INFO
+    com.fco.platform: INFO

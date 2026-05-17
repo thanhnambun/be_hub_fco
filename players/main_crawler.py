@@ -35,7 +35,7 @@ def get_admin_token() -> str:
     # THAY BẰNG TÀI KHOẢN ADMIN TRONG DATABASE CỦA BẠN
     payload = {
         "identifier": "admin", 
-        "password": "password123" 
+        "password": "admin12345" 
     }
     
     print("[auth] Đang đăng nhập lấy Token Admin...")

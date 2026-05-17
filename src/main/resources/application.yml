@@ -1,6 +1,13 @@
+server:
+  tomcat:
+    max-http-post-size: 10MB
+
 spring:
   application:
-    name: base_spring_boot
+    name: fco_platform
+  threads:
+    virtual:
+      enabled: true
   datasource:
     # Security: all credentials are sourced from environment variables
     url: ${DB_URL:jdbc:mysql://localhost:3306/ecommer_fco?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
@@ -26,8 +33,9 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        format_sql: false
-        show_sql: false
+        generate_statistics: true
+        format_sql: true
+        show_sql: true
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -56,3 +64,9 @@ seed:
   # VD Docker: -e SEED_PLAYERS_FILE_PATH=/app/data/players.json
   # VD local:  export SEED_PLAYERS_FILE_PATH=D:/code/ecommer_fco/players.json
   players-file-path: ${SEED_PLAYERS_FILE_PATH:}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.fco.platform: DEBUG
