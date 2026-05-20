@@ -18,6 +18,6 @@ public class UpdateProfileRequest {
     private String fullName;
 
     @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
-    @jakarta.validation.constraints.Pattern(regexp = "^$|^0[35789]\\d{8}$", message = "Số điện thoại không hợp lệ (Phải bắt đầu bằng 03, 05, 07, 08, 09 và gồm 10 số)")
+    @PhoneNumber
     private String phone;
 }

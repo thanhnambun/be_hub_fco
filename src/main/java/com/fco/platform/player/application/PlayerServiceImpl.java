@@ -1,5 +1,6 @@
 package com.fco.platform.player.application;
 
+import com.fco.platform.auth.interfaces.dto.PhoneNumber;
 import com.fco.platform.common.exception.BusinessException;
 import com.fco.platform.common.exception.ErrorCode;
 import com.fco.platform.player.interfaces.dto.PlayerCardResponse;
@@ -27,12 +28,33 @@ public class PlayerServiceImpl implements IPlayerService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<PlayerCardResponse> getPlayers(String keyword, String seasonCode, int page, int size) {
+    public PageResponse<PlayerCardResponse> getPlayers(
+            String keyword,
+            String seasonCode,
+            Long nationId,
+            String position,
+            Long minPrice,
+            Long maxPrice,
+            int page,
+            int size
+    ) {
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new BusinessException(ErrorCode.MARKET_QUOTE_INVALID);
+        }
+
         int normalizedPage = Math.max(page, 0);
         int normalizedSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(normalizedPage, normalizedSize);
 
-        Page<PlayerCard> cardPage = playerCardRepository.search(keyword, seasonCode, pageable);
+        Page<PlayerCard> cardPage = playerCardRepository.search(
+                keyword,
+                seasonCode,
+                nationId,
+                position,
+                minPrice,
+                maxPrice,
+                pageable
+        );
         List<PlayerCardResponse> items = cardPage.getContent().stream()
                 .map(playerCardMapper::toResponse)
                 .toList();

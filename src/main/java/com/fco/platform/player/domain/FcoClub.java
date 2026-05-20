@@ -50,6 +50,10 @@ public class FcoClub {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
+
     @OneToMany(mappedBy = "club", fetch = FetchType.LAZY)
     @Builder.Default
     private List<FcoPlayer> players = new ArrayList<>();

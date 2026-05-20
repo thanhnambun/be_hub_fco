@@ -31,6 +31,7 @@ import java.util.Arrays;
 public class AuthController {
 
     private final IAuthService authService;
+    private final CookieUtils cookieUtils;
 
     // ── Register ──────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ public class AuthController {
             HttpServletResponse httpResponse
     ) {
         AuthIssuanceResult result = authService.register(request, httpRequest);
-        CookieUtils.setTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
+        cookieUtils.setTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ResponseWrapper.<AuthResponse>builder()
@@ -62,7 +63,7 @@ public class AuthController {
             HttpServletResponse httpResponse
     ) {
         AuthIssuanceResult result = authService.login(request, httpRequest);
-        CookieUtils.setTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
+        cookieUtils.setTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
 
         return ResponseEntity.ok(
                 ResponseWrapper.<AuthResponse>builder()
@@ -97,7 +98,7 @@ public class AuthController {
         }
 
         AuthIssuanceResult result = authService.refreshToken(refreshToken);
-        CookieUtils.rotateTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
+        cookieUtils.rotateTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
 
         return ResponseEntity.ok(
                 ResponseWrapper.<AuthResponse>builder()
@@ -120,7 +121,7 @@ public class AuthController {
         String refreshToken = extractCookieValue(httpRequest, "refresh_token");
 
         authService.logout(accessToken, refreshToken);
-        CookieUtils.clearTokenCookies(httpResponse);
+        cookieUtils.clearTokenCookies(httpResponse);
 
         return ResponseEntity.ok(
                 ResponseWrapper.<String>builder()

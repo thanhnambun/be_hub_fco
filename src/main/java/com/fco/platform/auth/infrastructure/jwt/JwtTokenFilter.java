@@ -3,7 +3,6 @@ package com.fco.platform.auth.infrastructure.jwt;
 import com.fco.platform.common.exception.AccountLockedException;
 import com.fco.platform.common.exception.TokenBlacklistedException;
 import com.fco.platform.auth.domain.User;
-import com.fco.platform.auth.infrastructure.security.MyUserDetails;
 import com.fco.platform.common.application.RedisService;
 import com.fco.platform.auth.infrastructure.security.MyUserDetailsService;
 import jakarta.servlet.FilterChain;
@@ -73,11 +72,8 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 String username = jwtService.extractUsername(token);
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                    
                     Long userId = null;
-                    if (userDetails instanceof MyUserDetails myUserDetails) {
-                        userId = myUserDetails.getUser().getId();
-                    } else if (userDetails instanceof User user) {
+                    if (userDetails instanceof User user) {
                         userId = user.getId();
                     }
 
@@ -97,6 +93,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             }
             filterChain.doFilter(request, response);
         } catch (RuntimeException ex) {
+            SecurityContextHolder.clearContext(); // Chặn rò rỉ SecurityContext khi gặp lỗi xác thực giữa chừng!
             exceptionResolver.resolveException(request, response, null, ex);
         }
     }

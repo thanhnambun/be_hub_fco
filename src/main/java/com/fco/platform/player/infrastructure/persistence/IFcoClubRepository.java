@@ -13,4 +13,6 @@ public interface IFcoClubRepository extends JpaRepository<FcoClub, Long> {
     Optional<FcoClub> findByClubName(String clubName);
 
     Optional<FcoClub> findByFifaaddictId(Integer fifaaddictId);
+
+    java.util.List<FcoClub> findAllByDeletedFalse();
 }

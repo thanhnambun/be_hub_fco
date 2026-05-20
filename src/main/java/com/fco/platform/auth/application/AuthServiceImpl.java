@@ -22,6 +22,7 @@ import com.fco.platform.common.application.RedisService;
 import com.fco.platform.common.util.ClientIpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements IAuthService {
@@ -106,11 +108,14 @@ public class AuthServiceImpl implements IAuthService {
             );
             User user = (User) authentication.getPrincipal();
             if (!Boolean.TRUE.equals(user.getStatus())) {
+                log.warn("{\"event\":\"AUTH_ACCOUNT_LOCKED\", \"principal\":\"{}\", \"ip\":\"{}\", \"userId\":{}}", user.getUsername(), ip, user.getId());
                 throw new AccountLockedException("Tài khoản của bạn đã bị khóa.");
             }
             clearLoginFailCounter(ip, principal);
+            log.info("{\"event\":\"AUTH_LOGIN_SUCCESS\", \"principal\":\"{}\", \"ip\":\"{}\", \"userId\":{}}", user.getUsername(), ip, user.getId());
             return issueTokens(user);
         } catch (BadCredentialsException ex) {
+            log.warn("{\"event\":\"AUTH_LOGIN_FAILURE\", \"principal\":\"{}\", \"ip\":\"{}\", \"reason\":\"Bad credentials\"}", principal, ip);
             increaseLoginFailCounter(ip, principal);
             throw ex;
         }
@@ -122,6 +127,7 @@ public class AuthServiceImpl implements IAuthService {
     public AuthIssuanceResult refreshToken(String oldRefreshToken) {
         String username = redisService.get(refreshKey(oldRefreshToken));
         if (username == null || username.isBlank()) {
+            log.warn("{\"event\":\"AUTH_REFRESH_ABUSE\", \"reason\":\"Invalid or replayed refresh token\", \"token\":\"{}\"}", oldRefreshToken);
             throw new HttpBadRequest("Refresh token is invalid or expired");
         }
 
@@ -129,12 +135,14 @@ public class AuthServiceImpl implements IAuthService {
                 .orElseThrow(() -> new HttpBadRequest("User not found"));
 
         if (!Boolean.TRUE.equals(user.getStatus())) {
+            log.warn("{\"event\":\"AUTH_REFRESH_LOCKED\", \"userId\":{}, \"username\":\"{}\"}", user.getId(), username);
             throw new AccountLockedException("Tài khoản đã bị khóa");
         }
 
         // Rotate: xóa token cũ, cấp token mới
         redisService.delete(refreshKey(oldRefreshToken));
 
+        log.info("{\"event\":\"AUTH_TOKEN_REFRESH\", \"userId\":{}, \"username\":\"{}\"}", user.getId(), username);
         return issueTokens(user);
     }
 

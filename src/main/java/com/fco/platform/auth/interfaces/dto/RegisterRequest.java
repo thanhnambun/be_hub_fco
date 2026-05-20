@@ -21,6 +21,7 @@ public class RegisterRequest {
     private String email;
 
     @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
+    @PhoneNumber
     private String phone;
 
     @NotBlank(message = "Mật khẩu không được để trống")

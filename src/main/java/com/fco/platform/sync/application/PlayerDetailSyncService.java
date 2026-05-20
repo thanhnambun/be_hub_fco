@@ -48,7 +48,7 @@ public class PlayerDetailSyncService {
      * Prevents N+1 queries by caching Nations, Leagues, Clubs, and Traits.
      */
     public static class SyncContext {
-        final Map<String, FcoPlayer> playerCache = new HashMap<>();
+        final Map<String, Long> playerIdCache = new HashMap<>();
         final Map<Long, List<PlayerCard>> cardsByPlayerIdCache = new HashMap<>();
         final Map<String, FcoNation> nationCache = new HashMap<>();
         final Map<String, FcoLeague> leagueCache = new HashMap<>();
@@ -107,7 +107,7 @@ public class PlayerDetailSyncService {
             if (!externalIds.isEmpty()) {
                 List<FcoPlayer> players = playerRepo.findAllByExternalIdIn(externalIds);
                 for (FcoPlayer p : players) {
-                    ctx.playerCache.put(p.getExternalId(), p);
+                    ctx.playerIdCache.put(p.getExternalId(), p.getId());
                 }
 
                 // B. Pre-load Player Cards
@@ -163,7 +163,7 @@ public class PlayerDetailSyncService {
             }
 
             log.info("[detail-sync] Warm-up lookups complete. Players: {}, Cards: {}, Nations: {}, Leagues: {}, Clubs: {}, Traits: {}",
-                    ctx.playerCache.size(), cardsCount(ctx.cardsByPlayerIdCache), ctx.nationCache.size(),
+                    ctx.playerIdCache.size(), cardsCount(ctx.cardsByPlayerIdCache), ctx.nationCache.size(),
                     ctx.leagueCache.size(), ctx.clubByNameCache.size(), ctx.traitCache.size());
 
         } catch (Exception ex) {

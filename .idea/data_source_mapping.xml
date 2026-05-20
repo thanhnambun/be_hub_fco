@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/de8ea7c4-95ca-41fe-8d45-f0c5718c6ac0/console.sql" value="de8ea7c4-95ca-41fe-8d45-f0c5718c6ac0" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/fco/platform/sync/application/PlayerSyncService.java" value="de8ea7c4-95ca-41fe-8d45-f0c5718c6ac0" />
+    <file url="file://$PROJECT_DIR$/src/main/resources/db/migration/V1__ecommerce_schema.sql" value="de8ea7c4-95ca-41fe-8d45-f0c5718c6ac0" />
+  </component>
+</project>

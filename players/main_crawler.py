@@ -399,9 +399,14 @@ if __name__ == "__main__":
     )
     
     # 1. Lưu ra file json để backup
-    with open("../src/main/resources/data/players.json", "w", encoding="utf-8") as f:
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(script_dir, "../src/main/resources/data/players.json")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
-    print(f"done: {len(output)} records saved locally.")
+    print(f"done: {len(output)} records saved locally at: {output_path}")
     
     # 2. LẤY TOKEN ADMIN
     admin_token = get_admin_token()

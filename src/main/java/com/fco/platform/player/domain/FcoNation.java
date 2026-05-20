@@ -37,6 +37,10 @@ public class FcoNation {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
+
     // Ngược lại: các cầu thủ thuộc quốc gia này
     @OneToMany(mappedBy = "nation", fetch = FetchType.LAZY)
     @Builder.Default

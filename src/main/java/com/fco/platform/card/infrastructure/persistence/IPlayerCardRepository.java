@@ -15,6 +15,7 @@ public interface IPlayerCardRepository extends JpaRepository<PlayerCard, Long> {
 
     List<PlayerCard> findAllByPlayerId(Long playerId);
     List<PlayerCard> findAllByPlayerIdIn(List<Long> playerIds);
+    boolean existsBySeasonId(Long seasonId);
 
     Optional<PlayerCard> findFirstByPlayerIdAndSeasonIdOrderByUpdatedAtDesc(Long playerId, Long seasonId);
     Optional<PlayerCard> findFirstByPlayerExternalIdAndSeasonSeasonCodeAndOvrOrderByUpdatedAtDesc(
@@ -23,17 +24,30 @@ public interface IPlayerCardRepository extends JpaRepository<PlayerCard, Long> {
             Integer ovr
     );
 
-    @EntityGraph(attributePaths = {"player", "season"})
+    @EntityGraph(attributePaths = {"player", "season", "player.nation", "player.club", "player.league"})
     @Query("""
             SELECT pc
             FROM PlayerCard pc
             JOIN pc.player p
             JOIN pc.season s
-            WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(p.playerName) LIKE LOWER(CONCAT('%', :keyword, '%')))
-              AND (:seasonCode IS NULL OR :seasonCode = '' OR LOWER(s.seasonCode) = LOWER(:seasonCode))
-            ORDER BY pc.updatedAt DESC
+            LEFT JOIN p.nation n
+            WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(TRIM(p.playerName)) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%')))
+              AND (:seasonCode IS NULL OR :seasonCode = '' OR LOWER(TRIM(s.seasonCode)) = LOWER(TRIM(:seasonCode)))
+              AND (:nationId IS NULL OR n.id = :nationId)
+              AND (:position IS NULL OR :position = '' OR LOWER(TRIM(pc.preferredPosition)) = LOWER(TRIM(:position)) OR LOWER(TRIM(pc.secondaryPosition)) = LOWER(TRIM(:position)))
+              AND (:minPrice IS NULL OR pc.marketPriceBp >= :minPrice)
+              AND (:maxPrice IS NULL OR pc.marketPriceBp <= :maxPrice)
+            ORDER BY pc.ovr DESC, pc.updatedAt DESC
             """)
-    Page<PlayerCard> search(@Param("keyword") String keyword, @Param("seasonCode") String seasonCode, Pageable pageable);
+    Page<PlayerCard> search(
+            @Param("keyword") String keyword,
+            @Param("seasonCode") String seasonCode,
+            @Param("nationId") Long nationId,
+            @Param("position") String position,
+            @Param("minPrice") Long minPrice,
+            @Param("maxPrice") Long maxPrice,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = {
             "player",

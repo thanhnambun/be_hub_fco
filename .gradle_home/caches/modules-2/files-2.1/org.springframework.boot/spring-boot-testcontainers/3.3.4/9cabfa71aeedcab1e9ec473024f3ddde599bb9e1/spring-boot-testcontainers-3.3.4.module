@@ -1,0 +1,132 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "org.springframework.boot",
+    "module": "spring-boot-testcontainers",
+    "version": "3.3.4",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "7.6.4"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.springframework.boot",
+          "module": "spring-boot-autoconfigure",
+          "version": {
+            "requires": "3.3.4"
+          }
+        },
+        {
+          "group": "org.testcontainers",
+          "module": "testcontainers",
+          "version": {
+            "requires": "1.19.8"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "spring-boot-testcontainers-3.3.4.jar",
+          "url": "spring-boot-testcontainers-3.3.4.jar",
+          "size": 119922,
+          "sha512": "e80a632a1ef2c995459dc22ca0ef2eaeb34ca55e688d59577ac018fc2907b41ded9256c86fe0281ad1742f2eb33d567028bbd394fb38e677d9b2d0fbe4a968bf",
+          "sha256": "91cb099c568ed6a25d01d6678a4a9bbc75aa2d87ae48668d8e85aeed3d669ceb",
+          "sha1": "1d8610a54c9aeb8932acd9ad01f208174f80a629",
+          "md5": "7ecfba158720cd2304e6ebd5a2d0678b"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.springframework.boot",
+          "module": "spring-boot-autoconfigure",
+          "version": {
+            "requires": "3.3.4"
+          }
+        },
+        {
+          "group": "org.testcontainers",
+          "module": "testcontainers",
+          "version": {
+            "requires": "1.19.8"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "spring-boot-testcontainers-3.3.4.jar",
+          "url": "spring-boot-testcontainers-3.3.4.jar",
+          "size": 119922,
+          "sha512": "e80a632a1ef2c995459dc22ca0ef2eaeb34ca55e688d59577ac018fc2907b41ded9256c86fe0281ad1742f2eb33d567028bbd394fb38e677d9b2d0fbe4a968bf",
+          "sha256": "91cb099c568ed6a25d01d6678a4a9bbc75aa2d87ae48668d8e85aeed3d669ceb",
+          "sha1": "1d8610a54c9aeb8932acd9ad01f208174f80a629",
+          "md5": "7ecfba158720cd2304e6ebd5a2d0678b"
+        }
+      ]
+    },
+    {
+      "name": "javadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "spring-boot-testcontainers-3.3.4-javadoc.jar",
+          "url": "spring-boot-testcontainers-3.3.4-javadoc.jar",
+          "size": 145860,
+          "sha512": "5307b95780dc3e062f220001ac49ae93e9fb14db64642f3782ee299d81cb6ad7b50da36895932d82a1e39a3bf24d58ef6256be739228788ae9bf1b7791456154",
+          "sha256": "a3d81b5487b606a23eeaebc196c678915a1af1b5dd65c2c1c997ffe5ea4b9dcc",
+          "sha1": "f6c0b2f1c03eb4fac9d5ebe09e5be52742c48768",
+          "md5": "019c4005d1446468ea198be06846b52f"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "spring-boot-testcontainers-3.3.4-sources.jar",
+          "url": "spring-boot-testcontainers-3.3.4-sources.jar",
+          "size": 92937,
+          "sha512": "ab0a8efbc13f1cdc07cd9d45c59d6a9f0d7fd87d4b73a96b9f602755c946d25006e7ad20d25ed77459341d4c844fa760818ee848fda4ad4a7210c10235084667",
+          "sha256": "fc7cd26d433820a8365d0c468abaf625344a53e3062f40a0cb25b0abfb5756a0",
+          "sha1": "1ae881c4efc9ec6f567e187ddf8774828c82f8bc",
+          "md5": "f907644313e416f086b3fc2739ebe122"
+        }
+      ]
+    }
+  ]
+}

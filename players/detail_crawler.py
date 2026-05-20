@@ -58,12 +58,13 @@ OVR_BONUS         = 4       # Level 5 kinh nghiệm = Level 1 + 4
 DELAY_SECONDS     = 1.5     # Delay giữa mỗi request tránh rate-limit
 CHUNK_SIZE        = 50      # Số record gửi lên API mỗi lần
 CHECKPOINT_EVERY  = 10      # Lưu done list mỗi N cầu thủ (phòng crash)
-INPUT_FILE        = "../src/main/resources/data/players.json"
-CRAWLED_FILE      = "../src/main/resources/data/detail_crawled.json"    # đã crawl HTML thành công
-SYNCED_FILE       = "../src/main/resources/data/detail_synced.json"      # đã POST API chunk thành công
-DONE_FILE         = "../src/main/resources/data/detail_done.json"       # summary / report, không dùng làm checkpoint
+SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
+INPUT_FILE        = os.path.join(SCRIPT_DIR, "../src/main/resources/data/players.json")
+CRAWLED_FILE      = os.path.join(SCRIPT_DIR, "../src/main/resources/data/detail_crawled.json")    # đã crawl HTML thành công
+SYNCED_FILE       = os.path.join(SCRIPT_DIR, "../src/main/resources/data/detail_synced.json")      # đã POST API chunk thành công
+DONE_FILE         = os.path.join(SCRIPT_DIR, "../src/main/resources/data/detail_done.json")       # summary / report, không dùng làm checkpoint
 # Ghi lỗi HTTP / mạng khi POST chunk (bổ sung cho bảng DB fco_detail_sync_errors của backend)
-DETAIL_API_ERROR_LOG = "../src/main/resources/data/detail_sync_api_errors.jsonl"
+DETAIL_API_ERROR_LOG = os.path.join(SCRIPT_DIR, "../src/main/resources/data/detail_sync_api_errors.jsonl")
 
 HEADERS = {
     "User-Agent": (

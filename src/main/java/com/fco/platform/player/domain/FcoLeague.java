@@ -37,6 +37,10 @@ public class FcoLeague {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
+
     // Các CLB thuộc giải đấu này
     @OneToMany(mappedBy = "league", fetch = FetchType.LAZY)
     @Builder.Default
