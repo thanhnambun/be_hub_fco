@@ -79,7 +79,7 @@ public class PlayerCard {
     @Column(name = "skill_level")
     private Integer skillLevel;
 
-    @Column(name = "secondary_position", length = 10)
+    @Column(name = "secondary_position", length = 100)
     private String secondaryPosition;
 
     @Column(name = "workrate_att", length = 10)

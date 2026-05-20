@@ -72,6 +72,8 @@ public class AdminCardController {
             throw new BusinessException(ErrorCode.VAL_BAD_REQUEST);
         }
 
+        validateSecondaryPosition(req.getSecondaryPosition());
+
         FcoPlayer player = playerRepo.findById(req.getPlayerId()).orElseThrow(() -> new BusinessException(ErrorCode.RES_NOT_FOUND));
         FcoSeason season = seasonRepo.findById(req.getSeasonId()).orElseThrow(() -> new BusinessException(ErrorCode.RES_NOT_FOUND));
         if (cardRepo.findFirstByPlayerIdAndSeasonIdOrderByUpdatedAtDesc(req.getPlayerId(), req.getSeasonId()).isPresent()) {
@@ -108,7 +110,10 @@ public class AdminCardController {
         if (req.getOvr() != null) card.setOvr(req.getOvr());
         if (req.getSalary() != null) card.setSalary(req.getSalary());
         if (req.getPreferredPosition() != null) card.setPreferredPosition(req.getPreferredPosition().trim());
-        if (req.getSecondaryPosition() != null) card.setSecondaryPosition(req.getSecondaryPosition().trim());
+        if (req.getSecondaryPosition() != null) {
+            validateSecondaryPosition(req.getSecondaryPosition());
+            card.setSecondaryPosition(req.getSecondaryPosition().trim());
+        }
         if (req.getMarketPriceBp() != null) card.setMarketPriceBp(req.getMarketPriceBp());
         if (req.getImageUrl() != null) card.setImageUrl(req.getImageUrl().trim());
         card.setUpdatedAt(LocalDateTime.now());
@@ -122,6 +127,27 @@ public class AdminCardController {
         PlayerCard card = cardRepo.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.RES_NOT_FOUND));
         cardRepo.delete(card);
         return ResponseEntity.ok(ResponseWrapper.<Void>builder().status(HttpStatus.OK).code(HttpStatus.OK.value()).build());
+    }
+
+    private void validateSecondaryPosition(String secPos) {
+        if (secPos == null || secPos.trim().isEmpty()) {
+            return;
+        }
+        if (secPos.length() > 100) {
+            throw new BusinessException("Vị trí phụ không được vượt quá 100 ký tự", ErrorCode.VAL_BAD_REQUEST);
+        }
+
+        java.util.List<String> validPositions = java.util.List.of(
+            "ST", "CF", "LW", "RW", "CAM", "CM", "LM", "RM", "CDM", "CB", "LB", "RB", "LWB", "RWB", "GK"
+        );
+
+        String[] parts = secPos.split(",");
+        for (String part : parts) {
+            String trimmed = part.trim().toUpperCase();
+            if (!trimmed.isEmpty() && !validPositions.contains(trimmed)) {
+                throw new BusinessException("Vị trí phụ không hợp lệ: " + trimmed + ". Các vị trí hợp lệ: ST, CF, LW, RW, CAM, CM, LM, RM, CDM, CB, LB, RB, LWB, RWB, GK", ErrorCode.VAL_BAD_REQUEST);
+            }
+        }
     }
 
     private AdminDtos.CardItem toCardItem(PlayerCard card) {

@@ -29,6 +29,9 @@ public enum ErrorCode {
     MARKET_QUOTE_INVALID("MKT_001", "Giá thị trường không hợp lệ.", HttpStatus.BAD_REQUEST, "market-quote-invalid"),
     SQUAD_VALIDATION("SQUAD_001", "Đội hình không hợp lệ.", HttpStatus.BAD_REQUEST, "squad-validation"),
     REVIEW_MODERATION("REV_001", "Đánh giá không được chấp nhận.", HttpStatus.BAD_REQUEST, "review-moderation"),
+    REVIEW_DUPLICATE("REV_002", "Bạn đã đánh giá thẻ cầu thủ này rồi.", HttpStatus.CONFLICT, "review-duplicate"),
+    REVIEW_CONTENT_REJECTED("REV_003", "Nội dung đánh giá chứa từ ngữ không phù hợp. Vui lòng chỉnh sửa lại.", HttpStatus.BAD_REQUEST, "review-content-rejected"),
+
     CRAWLER_PAYLOAD_INVALID("CRAW_001", "Payload đồng bộ crawler không hợp lệ.", HttpStatus.BAD_REQUEST, "crawler-payload-invalid"),
     SYNC_JOB_FAILED("SYNC_001", "Tác vụ đồng bộ thất bại.", HttpStatus.INTERNAL_SERVER_ERROR, "sync-job-failed"),
 

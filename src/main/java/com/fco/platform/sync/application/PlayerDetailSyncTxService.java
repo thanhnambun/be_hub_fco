@@ -58,15 +58,14 @@ public class PlayerDetailSyncTxService {
     public PlayerDetailSyncService.DetailSyncOutcome syncOne(
             SyncPlayerDetailRequest dto,
             PlayerDetailSyncService.SyncContext ctx) {
-        if ("pidymvogjdjy".equals(dto.getExternalId())) {
-            throw new RuntimeException("FORCE_ROLLBACK");
-        }
 
-        // Luôn load player từ database trong Transaction để có managed entity, tránh LazyInitializationException khi thao tác trên Lazy Collections (như teamColors)
+        // Luôn load player từ database trong Transaction kèm @EntityGraph("teamColors")
+        // để tránh LazyInitializationException khi gọi player.getTeamColors().add(c)
         Long cachedPlayerId = ctx.playerIdCache.get(dto.getExternalId());
         FcoPlayer player = cachedPlayerId != null
-                ? playerRepo.findById(cachedPlayerId).orElseGet(() -> playerRepo.findByExternalId(dto.getExternalId()).orElse(null))
-                : playerRepo.findByExternalId(dto.getExternalId()).orElse(null);
+                ? playerRepo.findWithTeamColorsById(cachedPlayerId)
+                        .orElseGet(() -> playerRepo.findWithTeamColorsByExternalId(dto.getExternalId()).orElse(null))
+                : playerRepo.findWithTeamColorsByExternalId(dto.getExternalId()).orElse(null);
 
         if (player == null) {
             log.warn("[detail-sync] Không tìm thấy player externalId={} — bỏ qua", dto.getExternalId());

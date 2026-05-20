@@ -61,6 +61,8 @@ jwt:
 app:
   cookie:
     secure: ${COOKIE_SECURE:false}
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

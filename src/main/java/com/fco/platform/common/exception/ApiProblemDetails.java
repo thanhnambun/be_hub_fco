@@ -44,7 +44,9 @@ public final class ApiProblemDetails {
     }
 
     public static ProblemDetail fallback(Throwable ex, URI instance) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SYST_ERROR.getMessage());
+        String originalMsg = ex.getMessage();
+        String detailMessage = ErrorCode.SYST_ERROR.getMessage() + (originalMsg != null ? " (Chi tiết: " + originalMsg + ")" : "");
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detailMessage);
         pd.setType(ErrorCode.SYST_ERROR.getTypeUri());
         pd.setTitle(ErrorCode.SYST_ERROR.name());
         pd.setInstance(instance);

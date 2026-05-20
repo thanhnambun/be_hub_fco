@@ -13,6 +13,16 @@ public interface IFcoPlayerRepository extends JpaRepository<FcoPlayer, Long> {
     boolean existsByNationId(Long nationId);
     boolean existsByLeagueId(Long leagueId);
 
+    /**
+     * Load player cùng với teamColors (Lazy collection) trong cùng một query.
+     * Dùng trong sync service để tránh LazyInitializationException khi thêm club vào teamColors.
+     */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"teamColors"})
+    Optional<FcoPlayer> findWithTeamColorsById(Long id);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"teamColors"})
+    Optional<FcoPlayer> findWithTeamColorsByExternalId(String externalId);
+
     @Override
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"nation", "club", "league"})
     org.springframework.data.domain.Page<FcoPlayer> findAll(org.springframework.data.domain.Pageable pageable);

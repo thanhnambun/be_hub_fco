@@ -6,6 +6,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -41,6 +43,15 @@ public class FcoCardReview {
     @Builder.Default
     private String status = "ACTIVE";
 
+    /** false = chờ AI kiểm duyệt | true = đã được AI thẩm định */
+    @Column(name = "is_ai_checked", nullable = false)
+    @Builder.Default
+    private Boolean isAiChecked = false;
+
+    @OneToMany(mappedBy = "review", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<FcoCardReviewReply> replies = new ArrayList<>();
+
     @Column(name = "created_at", nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -49,3 +60,4 @@ public class FcoCardReview {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 }
+

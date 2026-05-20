@@ -1,0 +1,42 @@
+# Danh sách từ ngữ bị cấm (bad-words.txt)
+# Mỗi từ trên 1 dòng, không phân biệt hoa thường
+# Bổ sung thêm theo nhu cầu kiểm duyệt thực tế
+
+# --- Từ tục tĩu tiếng Việt phổ biến ---
+dcm
+đcm
+dm
+đm
+clm
+vkl
+vl
+wtf
+cc
+đái
+cặc
+lồn
+buồi
+đéo
+địt
+đụ
+mẹ mày
+con mẹ
+thằng chó
+con chó
+chó chết
+mả mày
+
+# --- Từ lóng mang nghĩa tiêu cực ---
+ngáo đá
+mất não
+ngu vl
+ngu vcl
+óc bò
+não cá vàng
+
+# --- Spam / Quảng cáo ---
+liên hệ zalo
+click vào link
+mua ngay
+giá rẻ nhất
+xem thêm tại
