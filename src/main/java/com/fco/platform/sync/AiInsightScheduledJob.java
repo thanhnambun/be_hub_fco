@@ -54,18 +54,59 @@ public class AiInsightScheduledJob {
         for (Map.Entry<Long, List<FcoCardReview>> entry : byCard.entrySet()) {
             Long cardId = entry.getKey();
             List<FcoCardReview> cardReviews = entry.getValue();
-            String playerName = cardReviews.get(0).getCard().getPlayer() != null
-                    ? cardReviews.get(0).getCard().getPlayer().getPlayerName() : "Unknown";
+            
+            // Lấy thông tin thẻ cầu thủ
+            com.fco.platform.card.domain.PlayerCard card = cardReviews.get(0).getCard();
+            Map<String, Object> cardSpecs = buildCardSpecs(card);
 
             // Xử lý theo từng mẻ BATCH_SIZE để bảo toàn quota
             for (int i = 0; i < cardReviews.size(); i += BATCH_SIZE) {
                 List<FcoCardReview> batch = cardReviews.subList(i, Math.min(i + BATCH_SIZE, cardReviews.size()));
-                processBatch(cardId, playerName, batch);
+                processBatch(cardId, cardSpecs, batch);
             }
         }
     }
 
-    private void processBatch(Long cardId, String playerName, List<FcoCardReview> batch) {
+    private Map<String, Object> buildCardSpecs(com.fco.platform.card.domain.PlayerCard card) {
+        java.util.HashMap<String, Object> specs = new java.util.HashMap<>();
+        if (card == null) return specs;
+
+        String playerName = "Unknown";
+        int height = 0;
+        int weight = 0;
+        String preferredFoot = "Không rõ";
+        int weakFoot = 5;
+
+        if (card.getPlayer() != null) {
+            playerName = card.getPlayer().getPlayerName();
+            height = card.getPlayer().getHeight() != null ? card.getPlayer().getHeight() : 0;
+            weight = card.getPlayer().getWeight() != null ? card.getPlayer().getWeight() : 0;
+            preferredFoot = card.getPlayer().getPreferredFoot() != null ? card.getPlayer().getPreferredFoot() : "Không rõ";
+            weakFoot = card.getPlayer().getWeakFoot() != null ? card.getPlayer().getWeakFoot() : 5;
+        }
+
+        specs.put("playerName", playerName);
+        specs.put("season", card.getSeason() != null ? card.getSeason().getSeasonName() : "Unknown");
+        specs.put("ovr", card.getOvr() != null ? card.getOvr() : 0);
+        specs.put("salary", card.getSalary() != null ? card.getSalary() : 0);
+        specs.put("position", card.getPreferredPosition() != null ? card.getPreferredPosition() : "Không rõ");
+        specs.put("height", height);
+        specs.put("weight", weight);
+        specs.put("preferredFoot", preferredFoot);
+        specs.put("weakFoot", weakFoot);
+
+        // Hexagon stats
+        specs.put("pace", card.getPace() != null ? card.getPace() : 0);
+        specs.put("shooting", card.getShooting() != null ? card.getShooting() : 0);
+        specs.put("passing", card.getPassing() != null ? card.getPassing() : 0);
+        specs.put("dribbling", card.getDribbling() != null ? card.getDribbling() : 0);
+        specs.put("defending", card.getDefending() != null ? card.getDefending() : 0);
+        specs.put("physicality", card.getPhysicality() != null ? card.getPhysicality() : 0);
+
+        return specs;
+    }
+
+    private void processBatch(Long cardId, Map<String, Object> cardSpecs, List<FcoCardReview> batch) {
         // Chuẩn bị dữ liệu gửi cho Gemini
         List<Map<String, Object>> reviewData = new ArrayList<>();
         for (FcoCardReview r : batch) {
@@ -75,7 +116,7 @@ public class AiInsightScheduledJob {
             ));
         }
 
-        GeminiService.BatchResult result = geminiService.processBatch(cardId, playerName, reviewData);
+        GeminiService.BatchResult result = geminiService.processBatch(cardId, cardSpecs, reviewData);
         if (result == null) {
             // Không có key hoặc lỗi API → đánh dấu checked để tránh lặp vô tận
             batch.forEach(r -> r.setIsAiChecked(true));

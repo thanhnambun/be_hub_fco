@@ -45,13 +45,17 @@ public class GeminiService {
      * Gửi mẻ review để kiểm duyệt VÀ tổng hợp lối chơi trong 1 lần gọi API.
      * Prompt được thiết kế để Gemini trả về JSON chuẩn.
      */
-    public BatchResult processBatch(Long cardId, String playerName, List<Map<String, Object>> reviews) {
+    /**
+     * Gửi mẻ review để kiểm duyệt VÀ tổng hợp lối chơi trong 1 lần gọi API.
+     * Prompt được thiết kế để Gemini trả về JSON chuẩn kết hợp chỉ số cầu thủ và review của user.
+     */
+    public BatchResult processBatch(Long cardId, Map<String, Object> cardSpecs, List<Map<String, Object>> reviews) {
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("GeminiService: GEMINI_API_KEY chưa được cấu hình — bỏ qua batch cardId={}", cardId);
             return null;
         }
 
-        String prompt = buildBatchPrompt(playerName, reviews);
+        String prompt = buildBatchPrompt(cardSpecs, reviews);
         try {
             String rawResponse = callGeminiApi(prompt);
             return parseBatchResponse(cardId, rawResponse);
@@ -63,27 +67,48 @@ public class GeminiService {
 
     // ── Private Helpers ────────────────────────────────────────────────────────
 
-    private String buildBatchPrompt(String playerName, List<Map<String, Object>> reviews) {
+    private String buildBatchPrompt(Map<String, Object> cardSpecs, List<Map<String, Object>> reviews) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Bạn là AI kiểm duyệt nội dung cho nền tảng game bóng đá FC Online tại Việt Nam.\n");
-        sb.append("Nhiệm vụ: Phân tích các bình luận dưới đây về cầu thủ '").append(playerName).append("'.\n\n");
-        sb.append("Hãy thực hiện 2 việc:\n");
-        sb.append("1. Với mỗi bình luận: xác định có vi phạm ngôn từ không (tục tĩu, spam, toxic) — ");
-        sb.append("kể cả từ lóng, từ viết tắt hoặc mỉa mai tinh vi.\n");
-        sb.append("2. Từ toàn bộ bình luận hợp lệ: tổng hợp lối chơi (positiveTags, negativeTags, summary).\n\n");
-        sb.append("Danh sách bình luận (JSON):\n");
+        sb.append("Bạn là AI chuyên gia phân tích dữ liệu và kiểm duyệt nội dung cho nền tảng game bóng đá FC Online tại Việt Nam.\n");
+        sb.append("Nhiệm vụ của bạn là phân tích các bình luận thực tế của người chơi kết hợp với thông số kỹ thuật (chỉ số, mùa giải, lương...) của thẻ cầu thủ dưới đây.\n\n");
+        
+        sb.append("--- THÔNG TIN THẺ CẦU THỦ ---\n");
+        sb.append("Tên cầu thủ: ").append(cardSpecs.getOrDefault("playerName", "Không rõ")).append("\n");
+        sb.append("Mùa giải (Season): ").append(cardSpecs.getOrDefault("season", "Không rõ")).append("\n");
+        sb.append("Chỉ số tổng quát (OVR): ").append(cardSpecs.getOrDefault("ovr", 0)).append("\n");
+        sb.append("Mức lương (Salary): ").append(cardSpecs.getOrDefault("salary", 0)).append("\n");
+        sb.append("Vị trí sở trường: ").append(cardSpecs.getOrDefault("position", "Không rõ")).append("\n");
+        sb.append("Thể hình: Chiều cao ").append(cardSpecs.getOrDefault("height", 0)).append("cm, Nặng ").append(cardSpecs.getOrDefault("weight", 0)).append("kg\n");
+        sb.append("Thuận chân (Preferred Foot/Weak Foot): ").append(cardSpecs.getOrDefault("preferredFoot", "Không rõ")).append(" (Chân không thuận: ").append(cardSpecs.getOrDefault("weakFoot", 5)).append("/5)\n");
+        sb.append("Chỉ số thành phần chính (Hexagon Stats):\n");
+        sb.append("  - Tốc độ (Pace): ").append(cardSpecs.getOrDefault("pace", 0)).append("\n");
+        sb.append("  - Dứt điểm (Shooting): ").append(cardSpecs.getOrDefault("shooting", 0)).append("\n");
+        sb.append("  - Chuyền bóng (Passing): ").append(cardSpecs.getOrDefault("passing", 0)).append("\n");
+        sb.append("  - Rê bóng (Dribbling): ").append(cardSpecs.getOrDefault("dribbling", 0)).append("\n");
+        sb.append("  - Phòng ngự (Defending): ").append(cardSpecs.getOrDefault("defending", 0)).append("\n");
+        sb.append("  - Thể chất (Physicality): ").append(cardSpecs.getOrDefault("physicality", 0)).append("\n\n");
+
+        sb.append("--- DANH SÁCH BÌNH LUẬN CỦA NGƯỜI CHƠI (JSON) ---\n");
         try {
             sb.append(objectMapper.writeValueAsString(reviews));
         } catch (Exception e) {
             sb.append("[]");
         }
-        sb.append("\n\nTRẢ VỀ DUY NHẤT JSON (không có markdown, không có text ngoài JSON):\n");
+        sb.append("\n\n");
+
+        sb.append("YÊU CẦU PHÂN TÍCH:\n");
+        sb.append("1. Kiểm duyệt (moderation): Xác định mỗi bình luận có vi phạm ngôn từ tục tĩu, spam, toxic hay không. Kể cả viết tắt (vd: cc, dkm), từ lóng bậy bạ của Việt Nam.\n");
+        sb.append("2. Phân tích lối chơi (summary):\n");
+        sb.append("  - Tổng hợp điểm mạnh (positiveTags) và điểm yếu (negativeTags) thực tế khi ingame. Chú ý đối chiếu chỉ số kỹ thuật với trải nghiệm thực tế trong bình luận (Ví dụ: OVR/Tốc độ cao nhưng bị bình luận chê chậm thì tag điểm yếu có thể là 'Chạy ảo' hoặc 'Gia tốc chậm'; hoặc Lương cao nhưng đá dở thì tag điểm yếu là 'Nặng lương').\n");
+        sb.append("  - Viết 1 đoạn tóm tắt ngắn (summary) không quá 2-3 câu khuyên dùng cầu thủ này như thế nào (Ví dụ: đá vị trí nào hợp nhất, có nên mua hay không, đáng lương hay không).\n\n");
+        
+        sb.append("TRẢ VỀ DUY NHẤT JSON (không có markdown ```json, không có text ngoài JSON):\n");
         sb.append("{\n");
         sb.append("  \"moderation\": [{\"reviewId\": <id>, \"isViolating\": <bool>, \"reason\": \"<lý do nếu vi phạm>\"}],\n");
         sb.append("  \"summary\": {\n");
         sb.append("    \"positiveTags\": [\"<tag1>\", \"<tag2>\"],\n");
         sb.append("    \"negativeTags\": [\"<tag1>\"],\n");
-        sb.append("    \"summary\": \"<đoạn tóm tắt ngắn không quá 2 câu>\"\n");
+        sb.append("    \"summary\": \"<đoạn tóm tắt ngắn khuyên dùng>\"\n");
         sb.append("  }\n");
         sb.append("}");
         return sb.toString();
@@ -91,11 +116,19 @@ public class GeminiService {
 
     private String callGeminiApi(String prompt) {
         WebClient client = webClientBuilder.build();
-        String requestBody = """
-                {
-                  "contents": [{"parts": [{"text": "%s"}]}]
-                }
-                """.formatted(prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+        
+        // Tạo cấu trúc request an toàn bằng Map/List
+        Map<String, Object> part = Map.of("text", prompt);
+        Map<String, Object> content = Map.of("parts", List.of(part));
+        Map<String, Object> payload = Map.of("contents", List.of(content));
+
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            log.error("GeminiService: Lỗi serialize request payload: {}", e.getMessage());
+            throw new RuntimeException("Failed to serialize request payload", e);
+        }
 
         return client.post()
                 .uri(GEMINI_API_URL + "?key=" + apiKey)

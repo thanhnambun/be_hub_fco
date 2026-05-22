@@ -44,5 +44,6 @@ public class FcoLeague {
     // Các CLB thuộc giải đấu này
     @OneToMany(mappedBy = "league", fetch = FetchType.LAZY)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<FcoClub> clubs = new ArrayList<>();
 }

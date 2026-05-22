@@ -88,6 +88,7 @@ public class AuthController {
     ) {
         String refreshToken = extractCookieValue(httpRequest, "refresh_token");
         if (refreshToken == null || refreshToken.isBlank()) {
+            cookieUtils.clearTokenCookies(httpResponse);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     ResponseWrapper.<AuthResponse>builder()
                             .status(HttpStatus.UNAUTHORIZED)
@@ -97,17 +98,22 @@ public class AuthController {
             );
         }
 
-        AuthIssuanceResult result = authService.refreshToken(refreshToken);
-        cookieUtils.rotateTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
+        try {
+            AuthIssuanceResult result = authService.refreshToken(refreshToken);
+            cookieUtils.rotateTokenCookies(httpResponse, result.getAccessToken(), result.getRefreshToken());
 
-        return ResponseEntity.ok(
-                ResponseWrapper.<AuthResponse>builder()
-                        .status(HttpStatus.OK)
-                        .code(HttpStatus.OK.value())
-                        .message("Làm mới token thành công")
-                        .data(result.getProfile())
-                        .build()
-        );
+            return ResponseEntity.ok(
+                    ResponseWrapper.<AuthResponse>builder()
+                            .status(HttpStatus.OK)
+                            .code(HttpStatus.OK.value())
+                            .message("Làm mới token thành công")
+                            .data(result.getProfile())
+                            .build()
+            );
+        } catch (RuntimeException ex) {
+            cookieUtils.clearTokenCookies(httpResponse);
+            throw ex;
+        }
     }
 
     // ── Logout ────────────────────────────────────────────────────────────────
@@ -162,8 +168,12 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<ResponseWrapper<String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<ResponseWrapper<String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletResponse httpResponse
+    ) {
         authService.resetPassword(request);
+        cookieUtils.clearTokenCookies(httpResponse);
         return ResponseEntity.ok(
                 ResponseWrapper.<String>builder()
                         .status(HttpStatus.OK)

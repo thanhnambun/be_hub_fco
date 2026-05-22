@@ -3,6 +3,7 @@ package com.fco.platform.player.interfaces.web;
 import com.fco.platform.auth.domain.User;
 import com.fco.platform.common.dto.ResponseWrapper;
 import com.fco.platform.common.dto.resp.PageResponse;
+import com.fco.platform.player.application.ICardVoteService;
 import com.fco.platform.player.application.IPlayerReviewService;
 import com.fco.platform.player.interfaces.dto.ReviewDtos;
 import jakarta.validation.Valid;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class PlayerReviewController {
 
     private final IPlayerReviewService reviewService;
+    private final ICardVoteService     cardVoteService;
 
     // ── GET reviews của 1 thẻ (Public) ────────────────────────────────────────
 
@@ -125,6 +127,20 @@ public class PlayerReviewController {
                 .status(HttpStatus.OK).code(200)
                 .data(toPageResponse(result))
                 .build());
+    }
+
+    // ── POST bình chọn NGON/PHE trực tiếp lên Thẻ cầu thủ ─────────────────────
+
+    @PostMapping("/api/v1/cards/{cardId}/card-vote")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<ReviewDtos.CardVoteResponse>> toggleCardVote(
+            @PathVariable Long cardId,
+            @Valid @RequestBody ReviewDtos.CardVoteRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        ReviewDtos.CardVoteResponse result = cardVoteService.toggleCardVote(cardId, request, currentUser.getId());
+        return ResponseEntity.ok(ResponseWrapper.<ReviewDtos.CardVoteResponse>builder()
+                .status(HttpStatus.OK).code(200).data(result).build());
     }
 
     // ── Helper ─────────────────────────────────────────────────────────────────

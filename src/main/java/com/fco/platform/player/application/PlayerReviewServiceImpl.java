@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -45,8 +46,18 @@ public class PlayerReviewServiceImpl implements IPlayerReviewService {
     public Page<ReviewDtos.ReviewResponse> getCardReviews(Long cardId, int page, int size, Long currentUserId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(size, 50),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
-        return reviewRepo.findByCardIdAndStatus(cardId, "ACTIVE", pageable)
-                .map(r -> toReviewResponse(r, currentUserId));
+        Page<FcoCardReview> reviewPage = reviewRepo.findByCardIdAndStatus(cardId, "ACTIVE", pageable);
+        
+        if (reviewPage.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<Long> reviewIds = reviewPage.getContent().stream().map(FcoCardReview::getId).toList();
+        
+        Map<Long, Map<String, Long>> voteCountsMap = fetchVoteCounts(reviewIds);
+        Map<Long, String> userVotesMap = fetchUserVotes(reviewIds, currentUserId);
+
+        return reviewPage.map(r -> toReviewResponseWithBatchData(r, voteCountsMap, userVotesMap));
     }
 
     // ── Submit Review ──────────────────────────────────────────────────────────
@@ -127,8 +138,12 @@ public class PlayerReviewServiceImpl implements IPlayerReviewService {
         if (!isAdmin && !review.getUser().getId().equals(userId)) {
             throw new AccessDeniedException("Bạn không có quyền xóa đánh giá này.");
         }
-        reviewRepo.delete(review);
-        log.info("Đã xóa review {}, bởi userId={}, isAdmin={}", reviewId, userId, isAdmin);
+
+        // Soft delete — chỉ đổi status, giữ nguyên dữ liệu để audit
+        review.setStatus("DELETED");
+        review.setUpdatedAt(java.time.LocalDateTime.now());
+        reviewRepo.save(review);
+        log.info("Đã xóa (soft) review {}, bởi userId={}, isAdmin={}", reviewId, userId, isAdmin);
     }
 
     // ── Add Reply ──────────────────────────────────────────────────────────────
@@ -172,8 +187,16 @@ public class PlayerReviewServiceImpl implements IPlayerReviewService {
     @Transactional(readOnly = true)
     public Page<ReviewDtos.RecentReviewResponse> getRecentReviews(int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(size, 20));
-        return reviewRepo.findRecentActiveReviews(pageable)
-                .map(this::toRecentReviewResponse);
+        Page<FcoCardReview> reviewPage = reviewRepo.findRecentActiveReviews(pageable);
+        
+        if (reviewPage.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<Long> reviewIds = reviewPage.getContent().stream().map(FcoCardReview::getId).toList();
+        Map<Long, Map<String, Long>> voteCountsMap = fetchVoteCounts(reviewIds);
+
+        return reviewPage.map(r -> toRecentReviewResponseWithBatchData(r, voteCountsMap));
     }
 
     // ── Private Helpers ────────────────────────────────────────────────────────
@@ -188,6 +211,36 @@ public class PlayerReviewServiceImpl implements IPlayerReviewService {
                     .map(v -> v.getVoteType().name())
                     .orElse(null);
         }
+
+        List<ReviewDtos.ReplyResponse> replyResponses = r.getReplies().stream()
+                .map(this::toReplyResponse).toList();
+
+        return ReviewDtos.ReviewResponse.builder()
+                .id(r.getId())
+                .cardId(r.getCard().getId())
+                .authorUsername(r.getUser().getUsername())
+                .authorFullName(r.getUser().getFullName())
+                .ingameRank(r.getIngameRank())
+                .content(r.getContent())
+                .status(r.getStatus())
+                .ngonCount(ngon)
+                .pheCount(phe)
+                .currentUserVote(currentVote)
+                .replyCount(replyResponses.size())
+                .replies(replyResponses)
+                .createdAt(r.getCreatedAt())
+                .build();
+    }
+
+    private ReviewDtos.ReviewResponse toReviewResponseWithBatchData(
+            FcoCardReview r,
+            java.util.Map<Long, java.util.Map<String, Long>> voteCountsMap,
+            java.util.Map<Long, String> userVotesMap) {
+        
+        java.util.Map<String, Long> counts = voteCountsMap.getOrDefault(r.getId(), Collections.emptyMap());
+        long ngon = counts.getOrDefault("NGON", 0L);
+        long phe  = counts.getOrDefault("PHE", 0L);
+        String currentVote = userVotesMap.get(r.getId());
 
         List<ReviewDtos.ReplyResponse> replyResponses = r.getReplies().stream()
                 .map(this::toReplyResponse).toList();
@@ -245,6 +298,57 @@ public class PlayerReviewServiceImpl implements IPlayerReviewService {
     private ReviewDtos.RecentReviewResponse toRecentReviewResponse(FcoCardReview r) {
         long ngon = voteRepo.countByReviewIdAndVoteType(r.getId(), FcoReviewVote.VoteType.NGON);
         long phe  = voteRepo.countByReviewIdAndVoteType(r.getId(), FcoReviewVote.VoteType.PHE);
+        var card = r.getCard();
+        var player = card.getPlayer();
+        return ReviewDtos.RecentReviewResponse.builder()
+                .reviewId(r.getId())
+                .cardId(card.getId())
+                .playerName(player != null ? player.getPlayerName() : "")
+                .seasonCode(card.getSeason() != null ? card.getSeason().getSeasonCode() : "")
+                .imageUrl(card.getImageUrl())
+                .ovr(card.getOvr())
+                .authorUsername(r.getUser().getUsername())
+                .content(r.getContent())
+                .ingameRank(r.getIngameRank())
+                .ngonCount(ngon)
+                .pheCount(phe)
+                .createdAt(r.getCreatedAt())
+                .build();
+    }
+
+    private java.util.Map<Long, java.util.Map<String, Long>> fetchVoteCounts(List<Long> reviewIds) {
+        if (reviewIds == null || reviewIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> results = voteRepo.countVotesByReviewIdsIn(reviewIds);
+        java.util.Map<Long, java.util.Map<String, Long>> map = new java.util.HashMap<>();
+        for (Object[] row : results) {
+            Long reviewId = (Long) row[0];
+            FcoReviewVote.VoteType type = (FcoReviewVote.VoteType) row[1];
+            Long count = (Long) row[2];
+            map.computeIfAbsent(reviewId, k -> new java.util.HashMap<>()).put(type.name(), count);
+        }
+        return map;
+    }
+
+    private java.util.Map<Long, String> fetchUserVotes(List<Long> reviewIds, Long userId) {
+        if (userId == null || reviewIds == null || reviewIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<FcoReviewVote> votes = voteRepo.findByReviewIdInAndUserId(reviewIds, userId);
+        java.util.Map<Long, String> map = new java.util.HashMap<>();
+        for (FcoReviewVote v : votes) {
+            map.put(v.getReview().getId(), v.getVoteType().name());
+        }
+        return map;
+    }
+
+    private ReviewDtos.RecentReviewResponse toRecentReviewResponseWithBatchData(
+            FcoCardReview r,
+            java.util.Map<Long, java.util.Map<String, Long>> voteCountsMap) {
+        java.util.Map<String, Long> counts = voteCountsMap.getOrDefault(r.getId(), Collections.emptyMap());
+        long ngon = counts.getOrDefault("NGON", 0L);
+        long phe  = counts.getOrDefault("PHE", 0L);
         var card = r.getCard();
         var player = card.getPlayer();
         return ReviewDtos.RecentReviewResponse.builder()

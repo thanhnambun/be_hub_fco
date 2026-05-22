@@ -34,9 +34,9 @@ CREATE INDEX idx_fco_replies_review ON fco_card_review_replies (review_id);
 -- ==========================================
 CREATE TABLE fco_card_ai_summaries (
     card_id        BIGINT PRIMARY KEY,
-    positive_tags  TEXT NOT NULL DEFAULT '[]' COMMENT 'JSON array chuỗi: ["Tốc độ", "Dứt điểm sắc"]',
-    negative_tags  TEXT NOT NULL DEFAULT '[]' COMMENT 'JSON array chuỗi: ["Yếu tranh chấp"]',
-    summary        TEXT NOT NULL               COMMENT 'Đoạn tóm tắt lối chơi ngắn gọn từ AI',
+    positive_tags  TEXT NOT NULL COMMENT 'JSON array chuỗi: ["Tốc độ", "Dứt điểm sắc"]',
+    negative_tags  TEXT NOT NULL COMMENT 'JSON array chuỗi: ["Yếu tranh chấp"]',
+    summary        TEXT NOT NULL COMMENT 'Đoạn tóm tắt lối chơi ngắn gọn từ AI',
     updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_fco_ai_summary_card FOREIGN KEY (card_id) REFERENCES fco_player_cards (id) ON DELETE CASCADE
 );

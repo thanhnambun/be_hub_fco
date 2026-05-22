@@ -18,10 +18,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.Arrays;
 
+@Slf4j
 @Component
 public class JwtTokenFilter extends OncePerRequestFilter {
 
@@ -91,6 +93,10 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     }
                 }
             }
+            filterChain.doFilter(request, response);
+        } catch (io.jsonwebtoken.JwtException | IllegalArgumentException ex) {
+            log.debug("Invalid or expired JWT token, proceeding as guest: {}", ex.getMessage());
+            SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
         } catch (RuntimeException ex) {
             SecurityContextHolder.clearContext(); // Chặn rò rỉ SecurityContext khi gặp lỗi xác thực giữa chừng!

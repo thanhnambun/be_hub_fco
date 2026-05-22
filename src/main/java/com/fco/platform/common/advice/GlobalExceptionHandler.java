@@ -23,6 +23,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -72,6 +74,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("Access denied at {}: {}", request.getRequestURI(), ex.getMessage());
         ProblemDetail pd = ApiProblemDetails.from(ErrorCode.AUTH_ACCESS_DENIED, ErrorCode.AUTH_ACCESS_DENIED.getMessage(), HttpRequestUris.currentRequestUri(request));
+        return problem(HttpStatus.FORBIDDEN.value(), pd);
+    }
+
+    @ExceptionHandler({DisabledException.class, LockedException.class})
+    public ResponseEntity<ProblemDetail> handleDisabledOrLocked(Exception ex, HttpServletRequest request) {
+        log.warn("Account disabled or locked access attempt at {}: {}", request.getRequestURI(), ex.getMessage());
+        ProblemDetail pd = ApiProblemDetails.from(ErrorCode.AUTH_LOCKED, ErrorCode.AUTH_LOCKED.getMessage(), HttpRequestUris.currentRequestUri(request));
         return problem(HttpStatus.FORBIDDEN.value(), pd);
     }
 

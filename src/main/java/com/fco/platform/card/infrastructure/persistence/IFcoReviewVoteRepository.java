@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface IFcoReviewVoteRepository extends JpaRepository<FcoReviewVote, FcoReviewVoteId> {
@@ -24,4 +25,12 @@ public interface IFcoReviewVoteRepository extends JpaRepository<FcoReviewVote, F
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
     void deleteByReviewIdAndUserId(@Param("reviewId") Long reviewId, @Param("userId") Long userId);
+
+    /** Lấy danh sách thống kê vote (reviewId, voteType, count) cho một nhóm reviewId. */
+    @Query("SELECT v.review.id, v.voteType, COUNT(v) FROM FcoReviewVote v WHERE v.review.id IN :reviewIds GROUP BY v.review.id, v.voteType")
+    List<Object[]> countVotesByReviewIdsIn(@Param("reviewIds") java.util.Collection<Long> reviewIds);
+
+    /** Lấy toàn bộ vote của user hiện tại trên nhóm reviewId này. */
+    @Query("SELECT v FROM FcoReviewVote v WHERE v.review.id IN :reviewIds AND v.user.id = :userId")
+    List<FcoReviewVote> findByReviewIdInAndUserId(@Param("reviewIds") java.util.Collection<Long> reviewIds, @Param("userId") Long userId);
 }

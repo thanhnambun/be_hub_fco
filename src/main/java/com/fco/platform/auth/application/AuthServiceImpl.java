@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -186,10 +187,12 @@ public class AuthServiceImpl implements IAuthService {
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail().trim().toLowerCase();
         userRepository.findByEmail(email).ifPresent(user -> {
-            String token = UUID.randomUUID().toString();
-            redisService.set(resetPasswordKey(token), email, RESET_PASSWORD_TTL);
-            String resetLink = "http://localhost:3000/auth/reset-password?token=" + token;
-            mailService.sendResetPasswordEmail(email, resetLink);
+            // Xóa OTP cũ (nếu có) để đảm bảo mỗi email chỉ có 1 OTP active
+            redisService.delete(resetPasswordKey(email));
+            // Sinh OTP 6 chữ số ngẫu nhiên
+            String otp = String.format("%06d", new SecureRandom().nextInt(1_000_000));
+            redisService.set(resetPasswordKey(email), otp, RESET_PASSWORD_TTL);
+            mailService.sendOtpEmail(email, otp);
         });
     }
 
@@ -200,19 +203,23 @@ public class AuthServiceImpl implements IAuthService {
             throw new HttpBadRequest("Mật khẩu xác nhận không khớp");
         }
 
-        String token = request.getToken().trim();
-        String email = redisService.get(resetPasswordKey(token));
+        String email      = request.getEmail().trim().toLowerCase();
+        String inputOtp   = request.getOtp().trim();
+        String storedOtp  = redisService.get(resetPasswordKey(email));
 
-        if (email == null || email.isBlank()) {
-            throw new HttpBadRequest("Token không hợp lệ hoặc hết hạn");
+        if (storedOtp == null || storedOtp.isBlank()) {
+            throw new HttpBadRequest("Mã OTP không hợp lệ hoặc đã hết hạn");
+        }
+        if (!storedOtp.equals(inputOtp)) {
+            throw new HttpBadRequest("Mã OTP không đúng");
         }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new HttpBadRequest("Token không hợp lệ hoặc hết hạn"));
+                .orElseThrow(() -> new HttpBadRequest("Không tìm thấy tài khoản với email này"));
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
-        redisService.delete(resetPasswordKey(token));
+        redisService.delete(resetPasswordKey(email));
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────────
@@ -294,7 +301,7 @@ public class AuthServiceImpl implements IAuthService {
 
     private String refreshKey(String token)     { return "RT:"                + token; }
     private String blacklistKey(String token)   { return "BL:"                + token; }
-    private String resetPasswordKey(String token) { return "RESET_PW:"        + token; }
+    private String resetPasswordKey(String email) { return "RESET_PW:"         + email; }
     private String loginFailIpKey(String ip)    { return "LOGIN_FAIL_IP:"     + ip; }
     private String loginFailUserKey(String u)   { return "LOGIN_FAIL_USER:"   + u.toLowerCase(); }
 }

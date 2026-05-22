@@ -86,5 +86,6 @@ public class FcoPlayer {
     // Relations
     @OneToMany(mappedBy = "player", fetch = FetchType.LAZY)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<PlayerCard> cards = new ArrayList<>();
 }

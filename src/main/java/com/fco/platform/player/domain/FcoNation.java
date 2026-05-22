@@ -44,5 +44,6 @@ public class FcoNation {
     // Ngược lại: các cầu thủ thuộc quốc gia này
     @OneToMany(mappedBy = "nation", fetch = FetchType.LAZY)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<FcoPlayer> players = new ArrayList<>();
 }

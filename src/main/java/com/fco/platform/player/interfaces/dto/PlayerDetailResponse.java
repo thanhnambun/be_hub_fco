@@ -61,6 +61,12 @@ public class PlayerDetailResponse {
     private List<TraitResponse> traits;
     private List<PriceResponse> prices;
 
+    // --- Card-level Vote ---
+    private long ngonCount;
+    private long pheCount;
+    /** null = chưa vote, "NGON" / "PHE" = user hiện tại đang vote loại này */
+    private String currentUserVote;
+
     // Nested Classes
     @Data
     @Builder

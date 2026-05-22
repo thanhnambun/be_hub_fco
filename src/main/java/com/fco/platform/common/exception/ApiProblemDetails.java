@@ -44,15 +44,12 @@ public final class ApiProblemDetails {
     }
 
     public static ProblemDetail fallback(Throwable ex, URI instance) {
-        String originalMsg = ex.getMessage();
-        String detailMessage = ErrorCode.SYST_ERROR.getMessage() + (originalMsg != null ? " (Chi tiết: " + originalMsg + ")" : "");
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detailMessage);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SYST_ERROR.getMessage());
         pd.setType(ErrorCode.SYST_ERROR.getTypeUri());
         pd.setTitle(ErrorCode.SYST_ERROR.name());
         pd.setInstance(instance);
         pd.setProperty(PROPERTY_ERROR_CODE, ErrorCode.SYST_ERROR.getCode());
         pd.setProperty(PROPERTY_TIMESTAMP, Instant.now().toString());
-        pd.setProperty("exceptionType", ex.getClass().getName());
         return pd;
     }
 }

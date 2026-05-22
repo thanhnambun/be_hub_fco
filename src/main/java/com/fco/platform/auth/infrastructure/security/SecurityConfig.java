@@ -52,6 +52,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/reviews/recent").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cards/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cards/*/ai-summary").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/v1/players/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/ws/**").permitAll()

@@ -13,16 +13,17 @@ public class MailService {
     private final JavaMailSender mailSender;
 
     @Async
-    public void sendResetPasswordEmail(String to, String resetLink) {
+    public void sendOtpEmail(String to, String otp) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
-        message.setSubject("[FCO HUB] YEU CAU DAT LAI MAT KHAU");
+        message.setSubject("[FCO HUB] MA XAC NHAN DAT LAI MAT KHAU");
         message.setText(
                 "Xin chao,\n\n"
-                        + "Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan cua ban.\n"
-                        + "Vui long truy cap link duoi day trong 15 phut de tao mat khau moi:\n\n"
-                        + resetLink
-                        + "\n\nNeu ban khong thuc hien yeu cau nay, vui long bo qua email nay.\n\n"
+                        + "Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan cua ban.\n\n"
+                        + "Ma xac nhan cua ban la:\n\n"
+                        + "    " + otp + "\n\n"
+                        + "Ma nay co hieu luc trong 15 phut. Vui long khong chia se ma nay voi bat ky ai.\n\n"
+                        + "Neu ban khong thuc hien yeu cau nay, vui long bo qua email nay.\n\n"
                         + "FCO HUB Team"
         );
         mailSender.send(message);

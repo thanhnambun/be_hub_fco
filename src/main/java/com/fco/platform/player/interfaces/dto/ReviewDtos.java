@@ -124,4 +124,27 @@ public final class ReviewDtos {
         private long pheCount;
         private LocalDateTime createdAt;
     }
+
+    // ── Card-level Vote DTOs ────────────────────────────────────────────────────
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CardVoteRequest {
+        /** Giá trị hợp lệ: "NGON" hoặc "PHE" */
+        @NotBlank(message = "Loại vote không được để trống")
+        private String voteType;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CardVoteResponse {
+        private Long cardId;
+        private long ngonCount;
+        private long pheCount;
+        /** null = chưa vote, "NGON" / "PHE" = đang vote loại này */
+        private String currentUserVote;
+    }
 }

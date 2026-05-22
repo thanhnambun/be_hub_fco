@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface IFcoCardReviewRepository extends JpaRepository<FcoCardReview, Long> {
 
     /** Lấy danh sách đánh giá ACTIVE của 1 thẻ, kèm user và replies (tránh N+1). */
-    @EntityGraph(attributePaths = {"user", "replies", "replies.user"})
+    @EntityGraph(attributePaths = {"user"})
     Page<FcoCardReview> findByCardIdAndStatus(Long cardId, String status, Pageable pageable);
 
     /** Kiểm tra user đã viết đánh giá cho thẻ này chưa (enforce unique constraint). */

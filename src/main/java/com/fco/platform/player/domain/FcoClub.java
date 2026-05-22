@@ -56,5 +56,6 @@ public class FcoClub {
 
     @OneToMany(mappedBy = "club", fetch = FetchType.LAZY)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<FcoPlayer> players = new ArrayList<>();
 }

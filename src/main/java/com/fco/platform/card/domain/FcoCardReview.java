@@ -48,6 +48,7 @@ public class FcoCardReview {
     @Builder.Default
     private Boolean isAiChecked = false;
 
+    @org.hibernate.annotations.BatchSize(size = 25)
     @OneToMany(mappedBy = "review", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<FcoCardReviewReply> replies = new ArrayList<>();

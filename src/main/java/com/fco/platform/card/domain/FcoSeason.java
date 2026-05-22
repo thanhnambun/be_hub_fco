@@ -39,5 +39,6 @@ public class FcoSeason {
 
     @OneToMany(mappedBy = "season", fetch = FetchType.LAZY)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<PlayerCard> cards = new ArrayList<>();
 }

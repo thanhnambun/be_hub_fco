@@ -23,7 +23,7 @@ public class FcoCardReviewReply {
     @JoinColumn(name = "review_id", nullable = false)
     private FcoCardReview review;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
